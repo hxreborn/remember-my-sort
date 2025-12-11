@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "eu.hxreborn.remembermysort"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "eu.hxreborn.remembermysort"
         minSdk = 31
-        targetSdk = 35
+        targetSdk = 36
 
         versionCode = 1
         versionName = "1.0.0"

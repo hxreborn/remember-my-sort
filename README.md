@@ -9,11 +9,17 @@ LSPosed module that sets DocumentsUI file picker default sort to date descending
 
 Android file picker resets to alphabetical sort every time. Pick "sort by date", close the picker, open again, back to A-Z.
 
-Affects every app using the file picker (WhatsApp, Telegram, Gmail, browsers). Been broken [since 2021](https://xdaforums.com/t/google-files-default-sort.4309799/). Affects Pixel, Samsung, Xiaomi.
+**What's broken:**
+- Sort preference IS stored in SharedPreferences (`sortModel-sortType`)
+- Preference resets when picker closes
+- Affects all apps using Storage Access Framework picker
+- Broken since at least Android 12, reported [continuously since 2021](https://xdaforums.com/t/google-files-default-sort.4309799/)
+- Affects Pixel, Samsung, Xiaomi devices
 
-Why this sucks: Downloads folder has newest files at the bottom when sorted alphabetically. Downloaded something 5 minutes ago? Scroll past 300 old files to find it.
+**Why it matters:**
+Downloads folder grows chronologically. Users want newest files first. Forcing alphabetical sort on every picker launch adds friction to file selection workflow.
 
-**Google response:** None. Broken for 4+ years.
+**Google response:** No acknowledgment or fix. Still broken 4 years later.
 
 ## Solution
 
@@ -44,7 +50,7 @@ Requirements: JDK 21, Gradle 8.10+
 
 ## How it works
 
-Hooks DocumentsUI sort logic. Applies date descending when you haven't picked a sort. Detects which field is the date field instead of assuming fixed values.
+Hooks DocumentsUI sort logic. Applies date descending when user hasn't picked a sort. Detects date field dynamically instead of hardcoding values.
 
 ## License
 
