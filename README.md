@@ -5,10 +5,9 @@ Fixes the persistent sort reset issue in Android 11+ system file picker via LSPo
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1.0-blue)
 ![Android API](https://img.shields.io/badge/API-30%2B-brightgreen)
 
-
 ---
 
-## Why This Exists
+## Overview
 
 Starting with Android 11's [scoped storage](https://developer.android.com/about/versions/11/privacy/storage#scoped-storage), all apps that need file access must use the system file picker. This picker fails to persist sort preferences across directories. Sort order is kept in the root view, but navigating into any subdirectory resets it to filename A-Z. Users must manually change the sort every time they browse into a folder, regardless of how many times they've set it before.
 
