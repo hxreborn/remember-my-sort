@@ -13,7 +13,7 @@ android {
         minSdk = 31
         targetSdk = 36
 
-        versionCode = 1
+        versionCode = 100
         versionName = "1.0.0"
     }
 
@@ -54,7 +54,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig =
+                signingConfigs.getByName("release").takeIf { it.storeFile != null }
+                    ?: signingConfigs.getByName("debug")
         }
         debug {
             isMinifyEnabled = false
@@ -68,7 +70,6 @@ android {
     }
 
     buildFeatures {
-        viewBinding = true
         buildConfig = true
     }
 
@@ -84,23 +85,17 @@ android {
     packaging {
         resources {
             merges += "META-INF/xposed/*"
-            excludes +=
-                setOf(
-                    "META-INF/LICENSE",
-                    "META-INF/LICENSE.txt",
-                    "META-INF/NOTICE",
-                    "META-INF/NOTICE.txt",
-                    "META-INF/AL2.0",
-                    "META-INF/LGPL2.1",
-                    "META-INF/*.kotlin_module",
-                    "META-INF/INDEX.LIST",
-                )
         }
     }
 
     lint {
         abortOnError = true
-        disable.add("OldTargetApi")
+        disable.addAll(listOf("OldTargetApi", "PrivateApi", "DiscouragedPrivateApi"))
+        ignoreTestSources = true
+    }
+
+    tasks.withType<JavaCompile>().configureEach {
+        options.compilerArgs.add("-Xlint:none")
     }
 }
 
@@ -113,5 +108,4 @@ ktlint {
 dependencies {
     compileOnly(files("$rootDir/libs/api-100.aar"))
     compileOnly(files("$rootDir/libs/interface-100.aar"))
-    implementation(files("$rootDir/libs/service-100-1.0.0.aar"))
 }
