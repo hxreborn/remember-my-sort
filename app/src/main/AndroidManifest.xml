@@ -5,24 +5,7 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
-        android:description="@string/app_desc"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.RememberMySort">
-
-        <meta-data
-            android:name="xposedminversion"
-            android:value="93" />
-
-        <activity
-            android:name=".ui.SettingsActivity"
-            android:exported="true"
-            android:label="@string/app_name">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-
+        android:description="@string/app_desc">
     </application>
 
 </manifest>

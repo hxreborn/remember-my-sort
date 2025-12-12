@@ -1,8 +1,4 @@
 <resources>
     <string name="app_name">Remember My Sort</string>
-    <string name="app_desc">Overrides the Google DocumentsUI file picker sort mode on Android 13-16 QPR2</string>
-    <string name="settings_title">Sort Settings</string>
-    <string name="settings_description">Choose how files should be sorted in the file picker</string>
-    <string name="sort_mode_label">Sort Mode</string>
-    <string name="restart_notice">Changes take effect after restarting DocumentsUI</string>
+    <string name="app_desc">Restores sort persistence to the native Android file picker via LSPosed.</string>
 </resources>
