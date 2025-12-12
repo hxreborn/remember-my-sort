@@ -4,7 +4,7 @@ import android.content.Context
 import eu.hxreborn.remembermysort.model.Sort
 import java.io.File
 
-private const val PREF_FILENAME = "sort_preference.txt"
+private const val PREF_FILENAME = "rms_pref"
 private const val EXPECTED_PARTS = 2
 
 internal object SortPreferenceStore {
