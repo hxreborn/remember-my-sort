@@ -15,29 +15,36 @@ class RememberMySortModule(
 ) : XposedModule(base, param) {
     init {
         module = this
-        module.log("$TAG v${BuildConfig.VERSION_NAME}")
+        log("v${BuildConfig.VERSION_NAME} loaded")
     }
 
     override fun onPackageLoaded(param: PackageLoadedParam) {
-        if (param.packageName != TARGET_PACKAGE || !param.isFirstPackage) return
+        if (param.packageName != DOCUMENTSUI_PACKAGE || !param.isFirstPackage) return
 
         runCatching {
             val sortModel = param.classLoader.loadClass(SORT_MODEL_CLASS)
             val lookup = param.classLoader.loadClass(LOOKUP_CLASS)
             hook(
-                sortModel.getDeclaredMethod("sortCursor", Cursor::class.java, lookup),
+                sortModel.getDeclaredMethod(SORT_CURSOR_METHOD, Cursor::class.java, lookup),
                 SortCursorHooker::class.java,
             )
-            module.log("$TAG Hooked sortCursor")
+            log("${sortModel.simpleName}.$SORT_CURSOR_METHOD hooked")
         }.onFailure { e ->
-            module.log("$TAG Hook failed: ${e.message}")
+            log("Hook failed", e)
         }
     }
 
     companion object {
-        const val TAG = "RememberMySort"
-        private const val TARGET_PACKAGE = "com.google.android.documentsui"
+        private const val DOCUMENTSUI_PACKAGE = "com.google.android.documentsui"
         private const val SORT_MODEL_CLASS = "com.android.documentsui.sorting.SortModel"
         private const val LOOKUP_CLASS = "com.android.documentsui.base.Lookup"
+        private const val SORT_CURSOR_METHOD = "sortCursor"
+
+        fun log(
+            msg: String,
+            t: Throwable? = null,
+        ) {
+            if (t != null) module.log(msg, t) else module.log(msg)
+        }
     }
 }
