@@ -1,17 +1,16 @@
 package eu.hxreborn.remembermysort.model
 
 internal object Sort {
-    enum class Direction(
-        val value: Int,
-    ) {
-        ASC(1),
-        DESC(2),
-        ;
+    const val DIRECTION_ASC = 1
+    const val DIRECTION_DESC = 2
+}
 
-        companion object {
-            fun fromValue(value: Int): Direction? = entries.find { it.value == value }
-        }
-
-        operator fun invoke(): Int = value
+internal data class SortPreference(
+    val position: Int,
+    val dimId: Int,
+    val direction: Int,
+) {
+    companion object {
+        val DEFAULT = SortPreference(position = -1, dimId = -1, direction = Sort.DIRECTION_DESC)
     }
 }
