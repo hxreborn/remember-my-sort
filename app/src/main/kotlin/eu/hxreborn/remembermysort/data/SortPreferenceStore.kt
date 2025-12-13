@@ -1,6 +1,7 @@
 package eu.hxreborn.remembermysort.data
 
 import android.content.Context
+import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import eu.hxreborn.remembermysort.model.SortPreference
 import java.io.File
 
@@ -26,6 +27,7 @@ internal object SortPreferenceStore {
             File(context.filesDir, PREF_FILENAME)
                 .writeText("${pref.position}:${pref.dimId}:${pref.direction}")
             cached = pref
+            log("Persist: pos=${pref.position}, dimId=${pref.dimId}, dir=${pref.direction}")
         }
         return true
     }
@@ -41,6 +43,8 @@ internal object SortPreferenceStore {
                         SortPreference(pos.toInt(), dimId.toInt(), dir.trim().toInt())
                     }
             }?.getOrNull()
-            ?.also { cached = it }
-            ?: SortPreference.DEFAULT
+            ?.also {
+                cached = it
+                log("Load: pos=${it.position}, dimId=${it.dimId}, dir=${it.direction}")
+            } ?: SortPreference.DEFAULT
 }
