@@ -29,7 +29,9 @@ Works on AOSP-based ROMs and Pixel devices. OEM-modified ROMs are untested.
 1. Install [LSPosed](https://github.com/JingMatrix/LSPosed) (JingMatrix fork recommended)
 2. Download latest APK from [releases](../../releases)
 3. Install APK and enable module in LSPosed Manager
-4. Add `com.google.android.documentsui` to module scope
+4. Add your DocumentsUI package to module scope:
+   - Google/Pixel: `com.google.android.documentsui`
+   - AOSP: `com.android.documentsui`
 5. Force stop DocumentsUI
 6. Open any file picker to trigger DocumentsUI
 

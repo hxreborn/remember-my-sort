@@ -19,7 +19,7 @@ class RememberMySortModule(
     }
 
     override fun onPackageLoaded(param: PackageLoadedParam) {
-        if (param.packageName != DOCUMENTSUI_PACKAGE || !param.isFirstPackage) return
+        if (!param.isFirstPackage) return
 
         runCatching {
             val sortModel = param.classLoader.loadClass(SORT_MODEL_CLASS)
@@ -28,14 +28,13 @@ class RememberMySortModule(
                 sortModel.getDeclaredMethod(SORT_CURSOR_METHOD, Cursor::class.java, lookup),
                 SortCursorHooker::class.java,
             )
-            log("${sortModel.simpleName}.$SORT_CURSOR_METHOD hooked")
+            log("Hooked $SORT_CURSOR_METHOD in ${param.packageName}")
         }.onFailure { e ->
             log("Hook failed", e)
         }
     }
 
     companion object {
-        private const val DOCUMENTSUI_PACKAGE = "com.google.android.documentsui"
         private const val SORT_MODEL_CLASS = "com.android.documentsui.sorting.SortModel"
         private const val LOOKUP_CLASS = "com.android.documentsui.base.Lookup"
         private const val SORT_CURSOR_METHOD = "sortCursor"
