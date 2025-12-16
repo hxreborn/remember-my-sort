@@ -1,21 +1,38 @@
-tasks.register("clean", Delete::class) {
-    group = "build"
+import org.gradle.api.plugins.BasePlugin
+import org.gradle.api.tasks.Delete
+import org.gradle.api.tasks.Exec
+
+plugins {
+    base
+}
+
+tasks.named<Delete>("clean") {
+    group = BasePlugin.BUILD_GROUP
     description = "Deletes the build directory."
-    delete(
-        rootProject.layout.buildDirectory
-            .get()
-            .asFile,
-    )
+    delete(rootProject.layout.buildDirectory)
 }
 
 tasks.register("assembleDebugRelease") {
-    group = "build"
+    group = BasePlugin.BUILD_GROUP
     description = "Assembles both debug and release builds of the app module."
     dependsOn(":app:assembleDebug", ":app:assembleRelease")
 }
 
 tasks.register("cleanBuild") {
-    group = "build"
+    group = BasePlugin.BUILD_GROUP
     description = "Cleans the project and then assembles all builds in the app module."
     dependsOn("clean", "assembleDebugRelease")
+}
+
+tasks.register<Exec>("buildLibxposed") {
+    group = "libxposed"
+    description = "Builds libxposed/api and publishes to mavenLocal"
+    workingDir = layout.projectDirectory.dir("libxposed/api").asFile
+    commandLine(
+        "./gradlew",
+        ":api:publishApiPublicationToMavenLocal",
+        "-x",
+        ":checks:compileKotlin",
+        "--no-daemon",
+    )
 }

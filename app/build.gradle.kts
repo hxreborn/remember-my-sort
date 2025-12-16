@@ -12,7 +12,6 @@ android {
         applicationId = "eu.hxreborn.remembermysort"
         minSdk = 30
         targetSdk = 36
-
         versionCode = 121
         versionName = "1.2.1"
     }
@@ -26,20 +25,12 @@ android {
                     .orNull
 
             val storeFilePath = secret("RELEASE_STORE_FILE")
-            val storePassword = secret("RELEASE_STORE_PASSWORD")
-            val keyAlias = secret("RELEASE_KEY_ALIAS")
-            val keyPassword = secret("RELEASE_KEY_PASSWORD")
-            val storeType = secret("RELEASE_STORE_TYPE") ?: "PKCS12"
-
             if (!storeFilePath.isNullOrBlank()) {
                 storeFile = file(storeFilePath)
-                this.storePassword = storePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
-                this.storeType = storeType
-
-                enableV1Signing = false
-                enableV2Signing = true
+                storePassword = secret("RELEASE_STORE_PASSWORD")
+                keyAlias = secret("RELEASE_KEY_ALIAS")
+                keyPassword = secret("RELEASE_KEY_PASSWORD")
+                storeType = secret("RELEASE_STORE_TYPE") ?: "PKCS12"
             } else {
                 logger.warn("RELEASE_STORE_FILE not found. Release signing is disabled.")
             }
@@ -55,8 +46,9 @@ android {
                 "proguard-rules.pro",
             )
             signingConfig =
-                signingConfigs.getByName("release").takeIf { it.storeFile != null }
-                    ?: signingConfigs.getByName("debug")
+                signingConfigs
+                    .getByName("release")
+                    .takeIf { it.storeFile != null }
         }
         debug {
             isMinifyEnabled = false
@@ -73,10 +65,6 @@ android {
         buildConfig = true
     }
 
-    kotlin {
-        jvmToolchain(21)
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
@@ -84,19 +72,19 @@ android {
 
     packaging {
         resources {
-            merges += "META-INF/xposed/*"
+            pickFirsts += "META-INF/xposed/*"
         }
     }
 
     lint {
         abortOnError = true
-        disable.addAll(listOf("OldTargetApi", "PrivateApi", "DiscouragedPrivateApi"))
+        disable.addAll(listOf("PrivateApi", "DiscouragedPrivateApi"))
         ignoreTestSources = true
     }
+}
 
-    tasks.withType<JavaCompile>().configureEach {
-        options.compilerArgs.add("-Xlint:none")
-    }
+kotlin {
+    jvmToolchain(21)
 }
 
 ktlint {
@@ -106,6 +94,5 @@ ktlint {
 }
 
 dependencies {
-    compileOnly(files("$rootDir/libs/api-100.aar"))
-    compileOnly(files("$rootDir/libs/interface-100.aar"))
+    compileOnly(libs.libxposed.api)
 }
