@@ -2,6 +2,7 @@
 
 An LSPosed module that forces the Android file picker to remember your sorting preferences.
 
+![Android CI](https://github.com/hxreborn/remember-my-sort/actions/workflows/ci.yml/badge.svg)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1.0-blue)
 ![Android API](https://img.shields.io/badge/API-30%2B-brightgreen)
 
@@ -41,7 +42,7 @@ Works on AOSP-based ROMs and Pixel devices. OEM-modified ROMs are untested.
 ./gradlew assembleDebug
 ```
 
-Requires JDK 21 and Gradle 8.11.1.
+Requires JDK 21 and Gradle 8.13.
 
 ## License
 
