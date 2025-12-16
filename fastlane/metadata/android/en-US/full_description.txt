@@ -1,26 +1,31 @@
 Forces the Android system file picker (DocumentsUI) to persist sort preferences across directories and sessions.
 
-<b>The Problem</b>
+**The Problem**
+
 Android 11+ requires apps to use the system file picker for storage access. This picker resets sort order to filename A-Z whenever entering subdirectories. Users must manually re-sort every time.
 
-<b>The Fix</b>
+**The Fix**
+
 Hooks DocumentsUI sort handling to persist user preference. Manual sort changes are saved and restored automatically. Defaults to date descending on first run.
 
-<b>Requirements</b>
+**Requirements**
+
 - LSPosed framework (API 100+)
 - Android 11+ (API 30)
 - Root access
 
-<b>Supported Packages</b>
+**Supported Packages**
+
 - com.google.android.documentsui (Google/Pixel devices)
 - com.android.documentsui (AOSP ROMs)
 
-<b>Installation</b>
+**Installation**
+
 1. Install LSPosed (JingMatrix fork recommended)
 2. Install this module
 3. Enable in LSPosed Manager
 4. Add DocumentsUI package to module scope
 5. Force stop DocumentsUI
 
-Source: <a href="https://github.com/hxreborn/remember-my-sort">GitHub</a>
+Source: [GitHub](https://github.com/hxreborn/remember-my-sort)
 License: GPL-3.0

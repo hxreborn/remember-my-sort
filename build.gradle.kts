@@ -19,3 +19,16 @@ tasks.register("cleanBuild") {
     description = "Cleans the project and then assembles all builds in the app module."
     dependsOn("clean", "assembleDebugRelease")
 }
+
+tasks.register<Exec>("buildLibxposed") {
+    group = "libxposed"
+    description = "Builds libxposed/api and publishes to mavenLocal"
+    workingDir = file("libxposed/api")
+    commandLine(
+        "./gradlew",
+        ":api:publishApiPublicationToMavenLocal",
+        "-x",
+        ":checks:compileKotlin",
+        "--no-daemon"
+    )
+}

@@ -2,6 +2,10 @@
 agp = "8.11.0"
 kotlin = "2.1.0"
 ktlint = "12.2.0"
+xposed = "100"
+
+[libraries]
+libxposed-api = { group = "io.github.libxposed", name = "api", version.ref = "xposed" }
 
 [plugins]
 agp-app = { id = "com.android.application", version.ref = "agp" }

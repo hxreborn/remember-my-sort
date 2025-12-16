@@ -54,9 +54,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig =
-                signingConfigs.getByName("release").takeIf { it.storeFile != null }
-                    ?: signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release").takeIf { it.storeFile != null }
         }
         debug {
             isMinifyEnabled = false
@@ -106,6 +104,5 @@ ktlint {
 }
 
 dependencies {
-    compileOnly(files("$rootDir/libs/api-100.aar"))
-    compileOnly(files("$rootDir/libs/interface-100.aar"))
+    compileOnly(libs.libxposed.api)
 }
