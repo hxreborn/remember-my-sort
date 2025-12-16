@@ -19,7 +19,8 @@ android {
     signingConfigs {
         create("release") {
             fun secret(name: String): String? =
-                providers.gradleProperty(name)
+                providers
+                    .gradleProperty(name)
                     .orElse(providers.environmentVariable(name))
                     .orNull
 
@@ -44,7 +45,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = signingConfigs.getByName("release").takeIf { it.storeFile != null }
+            signingConfig =
+                signingConfigs
+                    .getByName("release")
+                    .takeIf { it.storeFile != null }
         }
         debug {
             isMinifyEnabled = false
