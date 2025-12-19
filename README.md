@@ -2,11 +2,14 @@
 
 An LSPosed module that forces the Android file picker to remember your sorting preferences.
 
-![Android CI](https://github.com/hxreborn/remember-my-sort/actions/workflows/ci.yml/badge.svg)
-![Kotlin](https://img.shields.io/badge/Kotlin-2.1.0-blue)
+![Android CI](https://github.com/hxreborn/remember-my-sort/actions/workflows/android.yml/badge.svg)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.1.21-blue)
 ![Android API](https://img.shields.io/badge/API-30%2B-brightgreen)
 
-[<img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid2.png" height="80" alt="Get it on IzzyOnDroid">](https://apt.izzysoft.de/packages/eu.hxreborn.remembermysort)
+<p>
+  <a href="https://apt.izzysoft.de/packages/eu.hxreborn.remembermysort"><img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" height="80" alt="Get it on IzzyOnDroid" /></a>
+  <a href="../../releases"><img src=".github/assets/badge_github.png" height="82" alt="Get it on GitHub" /></a>
+</p>
 
 ## Overview
 
