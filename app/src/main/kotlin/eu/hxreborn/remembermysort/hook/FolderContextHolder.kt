@@ -33,7 +33,10 @@ data class FolderContext(
         if (isVirtual) {
             GLOBAL_KEY
         } else {
-            "$userId:$authority:$rootId:$documentId"
+            val safeAuth = authority.ifEmpty { NULL_MARKER }
+            val safeRoot = rootId.ifEmpty { NULL_MARKER }
+            val safeDoc = documentId.ifEmpty { NULL_MARKER }
+            "$userId:$safeAuth:$safeRoot:$safeDoc"
         }
 
     companion object {

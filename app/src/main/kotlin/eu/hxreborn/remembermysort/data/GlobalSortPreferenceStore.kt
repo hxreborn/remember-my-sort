@@ -23,6 +23,7 @@ internal object GlobalSortPreferenceStore {
             ?: error("Failed to get application context")
     }
 
+    @Volatile
     private var cached: SortPreference? = null
 
     fun persist(pref: SortPreference): Boolean {

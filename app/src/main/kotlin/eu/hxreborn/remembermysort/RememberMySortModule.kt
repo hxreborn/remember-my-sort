@@ -3,9 +3,7 @@ package eu.hxreborn.remembermysort
 import android.database.Cursor
 import eu.hxreborn.remembermysort.hook.DirectoryLoaderHooker
 import eu.hxreborn.remembermysort.hook.FolderLoaderHooker
-import eu.hxreborn.remembermysort.hook.SearchLoaderHooker
 import eu.hxreborn.remembermysort.hook.SortCursorHooker
-import eu.hxreborn.remembermysort.prefs.PrefsManager
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
@@ -25,7 +23,6 @@ class RememberMySortModule(
     override fun onPackageLoaded(param: PackageLoadedParam) {
         if (!param.isFirstPackage) return
 
-        PrefsManager.init()
         hookSortCursor(param.classLoader)
         hookLoaders(param.classLoader)
 
@@ -51,7 +48,6 @@ class RememberMySortModule(
             listOf(
                 DIRECTORY_LOADER_CLASS to DirectoryLoaderHooker::class.java,
                 FOLDER_LOADER_CLASS to FolderLoaderHooker::class.java,
-                SEARCH_LOADER_CLASS to SearchLoaderHooker::class.java,
             )
 
         for ((className, hooker) in loaders) {
@@ -81,8 +77,10 @@ class RememberMySortModule(
         private const val SORT_CURSOR_METHOD = "sortCursor"
         private const val DIRECTORY_LOADER_CLASS = "com.android.documentsui.DirectoryLoader"
         private const val FOLDER_LOADER_CLASS = "com.android.documentsui.loaders.FolderLoader"
-        private const val SEARCH_LOADER_CLASS = "com.android.documentsui.loaders.SearchLoader"
         private const val LOAD_IN_BACKGROUND_METHOD = "loadInBackground"
+
+        // Hot-path logs gated behind this flag
+        const val DEBUG = false
 
         fun log(
             msg: String,

@@ -86,9 +86,9 @@ internal object FolderSortPreferenceStore {
 
             cache[folderKey] = pref
             evictIfNeeded()
+            writeToDiskLocked()
         }
 
-        writeToDisk()
         log("FolderSort: persisted to per-folder, key=$folderKey, pref=$pref")
         return true
     }
@@ -136,24 +136,23 @@ internal object FolderSortPreferenceStore {
         }
     }
 
-    private fun writeToDisk() {
+    // Caller must hold lock
+    private fun writeToDiskLocked() {
         runCatching {
             val tempFile = File(context.filesDir, "$PREF_FILENAME.tmp")
             val targetFile = File(context.filesDir, PREF_FILENAME)
 
             tempFile.bufferedWriter().use { writer ->
-                synchronized(lock) {
-                    cache.forEach { (key, pref) ->
-                        val json =
-                            JSONObject().apply {
-                                put("key", key)
-                                put("pos", pref.position)
-                                put("dimId", pref.dimId)
-                                put("dir", pref.direction)
-                            }
-                        writer.write(json.toString())
-                        writer.newLine()
-                    }
+                cache.forEach { (key, pref) ->
+                    val json =
+                        JSONObject().apply {
+                            put("key", key)
+                            put("pos", pref.position)
+                            put("dimId", pref.dimId)
+                            put("dir", pref.direction)
+                        }
+                    writer.write(json.toString())
+                    writer.newLine()
                 }
             }
 
@@ -170,9 +169,13 @@ internal object FolderSortPreferenceStore {
     }
 
     private fun evictIfNeeded() {
+        if (cache.size <= MAX_ENTRIES) return
+
+        val toEvict = cache.size - MAX_ENTRIES
         val iter = cache.entries.iterator()
         var evictedCount = 0
-        while (cache.size > MAX_ENTRIES && iter.hasNext()) {
+
+        while (evictedCount < toEvict && iter.hasNext()) {
             val entry = iter.next()
             // Preserve GLOBAL_KEY from LRU eviction
             if (entry.key != FolderContext.GLOBAL_KEY) {
@@ -180,6 +183,7 @@ internal object FolderSortPreferenceStore {
                 evictedCount++
             }
         }
+
         if (evictedCount > 0) {
             log("FolderSort: evicted $evictedCount oldest entries")
         }
