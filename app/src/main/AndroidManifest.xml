@@ -2,19 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
+        android:name=".RememberMySortApp"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:description="@string/app_desc">
 
-        <!-- Prefs provider for hook IPC - must be exported for DocumentsUI to query -->
-        <provider
-            android:name=".prefs.PrefsProvider"
-            android:authorities="eu.hxreborn.remembermysort.prefs"
-            android:exported="true"
-            android:grantUriPermissions="true" />
-
-        <!-- Settings activity for toggling per-folder feature -->
         <activity
             android:name=".ui.MainActivity"
             android:label="@string/app_name"

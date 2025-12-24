@@ -15,7 +15,7 @@ private const val MAX_ENTRIES = 256
 internal object FolderSortPreferenceStore {
     private val context by lazy { ContextHelper.applicationContext }
 
-    private val cache = LinkedHashMap<String, SortPreference>(MAX_ENTRIES, 0.75f, true) // accessOrder=true for LRU
+    private val cache = LinkedHashMap<String, SortPreference>(MAX_ENTRIES, 0.75f)
     private val lock = Any()
 
     private val ensureInit: Unit by lazy {
@@ -26,15 +26,11 @@ internal object FolderSortPreferenceStore {
 
     fun load(folderKey: String): SortPreference {
         ensureInit
-        synchronized(lock) {
-            cache[folderKey]?.let {
-                log("FolderSort: loaded from per-folder, key=$folderKey")
-                return it
+        return synchronized(lock) { cache[folderKey] }
+            ?.also { log("FolderSort: loaded from per-folder, key=$folderKey") }
+            ?: GlobalSortPreferenceStore.load().also {
+                log("FolderSort: fallback to global for key=$folderKey")
             }
-        }
-        return GlobalSortPreferenceStore.load().also {
-            log("FolderSort: fallback to global for key=$folderKey")
-        }
     }
 
     fun persist(

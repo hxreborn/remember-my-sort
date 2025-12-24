@@ -18,10 +18,6 @@ import io.github.libxposed.api.annotations.XposedHooker
 import java.util.Collections
 import java.util.WeakHashMap
 
-/**
- * Hooks SortModel.sortCursor to persist and restore sort preferences.
- * Routes to global (v1.x behavior) unless per-folder is enabled with valid context.
- */
 @XposedHooker
 class SortCursorHooker : XposedInterface.Hooker {
     companion object {

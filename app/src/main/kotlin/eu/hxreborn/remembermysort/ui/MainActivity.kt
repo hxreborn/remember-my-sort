@@ -1,17 +1,23 @@
 package eu.hxreborn.remembermysort.ui
 
 import android.app.Activity
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
-import eu.hxreborn.remembermysort.prefs.AppPrefsHelper
+import androidx.core.content.edit
+import eu.hxreborn.remembermysort.RememberMySortApp
+import eu.hxreborn.remembermysort.prefs.PrefsManager
+import io.github.libxposed.service.XposedService
+import io.github.libxposed.service.XposedServiceHelper
 
-/**
- * Simple settings activity for toggling per-folder sort preferences.
- * This is an experimental feature - when disabled, stock global behavior is used.
- */
-class MainActivity : Activity() {
+class MainActivity :
+    Activity(),
+    XposedServiceHelper.OnServiceListener {
+    private var remotePrefs: SharedPreferences? = null
+    private var toggle: Switch? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -43,12 +49,12 @@ class MainActivity : Activity() {
                 setPadding(0, 0, 0, 24)
             }
 
-        val toggle =
+        toggle =
             Switch(this).apply {
                 text = "Per-folder sort preferences"
-                isChecked = AppPrefsHelper.isPerFolderEnabled(this@MainActivity)
+                isEnabled = false
                 setOnCheckedChangeListener { _, isChecked ->
-                    AppPrefsHelper.setPerFolderEnabled(this@MainActivity, isChecked)
+                    remotePrefs?.edit { putBoolean(PrefsManager.KEY_PER_FOLDER_ENABLED, isChecked) }
                 }
             }
 
@@ -58,5 +64,32 @@ class MainActivity : Activity() {
         layout.addView(toggle)
 
         setContentView(layout)
+
+        RememberMySortApp.addServiceListener(this)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        RememberMySortApp.removeServiceListener(this)
+    }
+
+    override fun onServiceBind(service: XposedService) {
+        remotePrefs = service.getRemotePreferences(PrefsManager.PREFS_GROUP)
+        runOnUiThread { loadPrefs() }
+    }
+
+    override fun onServiceDied(service: XposedService) {
+        remotePrefs = null
+        runOnUiThread {
+            toggle?.isEnabled = false
+        }
+    }
+
+    private fun loadPrefs() {
+        val prefs = remotePrefs ?: return
+        toggle?.apply {
+            isEnabled = true
+            isChecked = prefs.getBoolean(PrefsManager.KEY_PER_FOLDER_ENABLED, false)
+        }
     }
 }

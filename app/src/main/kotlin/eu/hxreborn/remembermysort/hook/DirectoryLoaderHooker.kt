@@ -14,9 +14,6 @@ import java.lang.reflect.Field
 
 private const val DERIVED_TYPE_RECENTS = 1
 
-/**
- * Hooks DirectoryLoader.loadInBackground to capture folder context.
- */
 @XposedHooker
 class DirectoryLoaderHooker : XposedInterface.Hooker {
     companion object {

@@ -4,6 +4,7 @@ import android.database.Cursor
 import eu.hxreborn.remembermysort.hook.DirectoryLoaderHooker
 import eu.hxreborn.remembermysort.hook.FolderLoaderHooker
 import eu.hxreborn.remembermysort.hook.SortCursorHooker
+import eu.hxreborn.remembermysort.prefs.PrefsManager
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
@@ -22,6 +23,8 @@ class RememberMySortModule(
 
     override fun onPackageLoaded(param: PackageLoadedParam) {
         if (!param.isFirstPackage) return
+
+        PrefsManager.init(this)
 
         hookSortCursor(param.classLoader)
         hookLoaders(param.classLoader)

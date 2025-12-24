@@ -1,52 +1,50 @@
 package eu.hxreborn.remembermysort.prefs
 
-import android.net.Uri
+import android.content.SharedPreferences
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
-import eu.hxreborn.remembermysort.util.ContextHelper
+import io.github.libxposed.api.XposedInterface
 
-/**
- * Preferences manager for the hook process. Runs in DocumentsUI and queries the module
- * ContentProvider to fetch user settings. Lazy one-shot fetch with retry on next call if failed.
- */
 object PrefsManager {
-    private val PROVIDER_URI: Uri =
-        Uri.parse("content://${PrefsProvider.AUTHORITY}/per_folder_enabled")
+    const val PREFS_GROUP = "settings"
+    const val KEY_PER_FOLDER_ENABLED = "per_folder_enabled"
+
+    private var remotePrefs: SharedPreferences? = null
 
     @Volatile
-    private var perFolderEnabled: Boolean = false
+    private var perFolderEnabledCache: Boolean = false
 
-    @Volatile
-    private var providerQueried: Boolean = false
-
-    fun isPerFolderEnabled(): Boolean {
-        if (!providerQueried) {
-            refreshFromProvider()
-        }
-        return perFolderEnabled
-    }
-
-    fun invalidateCache() {
-        providerQueried = false
-    }
-
-    @Synchronized
-    private fun refreshFromProvider() {
-        if (providerQueried) return
+    fun init(xposed: XposedInterface) {
+        log("PrefsManager.init() called")
 
         runCatching {
-            val cursor =
-                ContextHelper.applicationContext.contentResolver
-                    .query(PROVIDER_URI, null, null, null, null) ?: return
+            remotePrefs = xposed.getRemotePreferences(PREFS_GROUP)
+            refreshCache()
 
-            cursor.use { c ->
-                if (c.moveToFirst()) {
-                    perFolderEnabled = c.getInt(0) == 1
-                    providerQueried = true
-                    log("PrefsManager: perFolderEnabled=$perFolderEnabled")
-                }
+            remotePrefs?.registerOnSharedPreferenceChangeListener { _, key ->
+                log("PrefsManager: preference changed: $key")
+                if (key == KEY_PER_FOLDER_ENABLED) refreshCache()
             }
-        }.onFailure { e ->
-            log("PrefsManager: failed to query provider", e)
+
+            log("PrefsManager.init() done, perFolderEnabled=$perFolderEnabledCache")
+        }.onFailure {
+            log("PrefsManager.init() failed to get remote preferences", it)
         }
     }
+
+    private fun refreshCache() {
+        val prefs =
+            remotePrefs ?: run {
+                log("refreshCache() remotePrefs is null")
+                return
+            }
+
+        runCatching {
+            perFolderEnabledCache = prefs.getBoolean(KEY_PER_FOLDER_ENABLED, false)
+            log("refreshCache() success: perFolderEnabled=$perFolderEnabledCache")
+        }.onFailure {
+            log("refreshCache() failed", it)
+        }
+    }
+
+    fun isPerFolderEnabled(): Boolean = perFolderEnabledCache
 }

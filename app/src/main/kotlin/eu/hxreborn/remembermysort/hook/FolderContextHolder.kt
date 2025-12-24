@@ -1,6 +1,5 @@
 package eu.hxreborn.remembermysort.hook
 
-/** Thread-local holder for folder context. Safe: sortCursor runs on Loader's background thread. */
 object FolderContextHolder {
     private val current = ThreadLocal<FolderContext?>()
 
@@ -15,11 +14,6 @@ object FolderContextHolder {
     }
 }
 
-/**
- * Folder context for per-folder sort preferences.
- *
- * @param isVirtual True for Recents/search/null mDoc (forces global prefs)
- */
 data class FolderContext(
     val userId: Int,
     val authority: String,
@@ -50,7 +44,6 @@ data class FolderContext(
                 isVirtual = true,
             )
 
-        /** Extract user ID from UserId object via reflection (hidden API). */
         fun extractUserId(userIdObj: Any?): Int =
             userIdObj?.let {
                 runCatching {
