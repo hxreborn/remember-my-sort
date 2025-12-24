@@ -6,6 +6,23 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:description="@string/app_desc">
+
+        <!-- Prefs provider for hook IPC - must be exported for DocumentsUI to query -->
+        <provider
+            android:name=".prefs.PrefsProvider"
+            android:authorities="eu.hxreborn.remembermysort.prefs"
+            android:exported="true" />
+
+        <!-- Settings activity for toggling per-folder feature -->
+        <activity
+            android:name=".ui.MainActivity"
+            android:label="@string/app_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>
