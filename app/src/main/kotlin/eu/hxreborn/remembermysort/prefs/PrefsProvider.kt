@@ -41,14 +41,17 @@ class PrefsProvider : ContentProvider() {
         return when (uriMatcher.match(uri)) {
             CODE_PER_FOLDER_ENABLED -> {
                 val enabled = AppPrefsHelper.isPerFolderEnabled(context)
-                MatrixCursor(arrayOf("value")).apply {
-                    addRow(arrayOf(if (enabled) 1 else 0))
-                }.also {
-                    Log.d(TAG, "PrefsProvider: per_folder_enabled=$enabled")
-                }
+                MatrixCursor(arrayOf("value"))
+                    .apply {
+                        addRow(arrayOf(if (enabled) 1 else 0))
+                    }.also {
+                        Log.d(TAG, "PrefsProvider: per_folder_enabled=$enabled")
+                    }
             }
 
-            else -> null
+            else -> {
+                null
+            }
         }
     }
 

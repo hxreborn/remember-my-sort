@@ -1,6 +1,7 @@
 package eu.hxreborn.remembermysort.hook
 
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
+import eu.hxreborn.remembermysort.prefs.PrefsManager
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedInterface.AfterHookCallback
 import io.github.libxposed.api.XposedInterface.BeforeHookCallback
@@ -10,17 +11,20 @@ import io.github.libxposed.api.annotations.XposedHooker
 import java.lang.reflect.Field
 
 /**
- * Hooks DirectoryLoader.loadInBackground() to capture folder context.
- * Sets FolderContextHolder before the method runs, clears it after (even on exception).
+ * Hooks DirectoryLoader.loadInBackground to capture folder context.
  */
 @XposedHooker
 class DirectoryLoaderHooker : XposedInterface.Hooker {
     companion object {
-        private var loaderFields: ReflectedLoaderFields? = null
+        private var loaderFields: DirLoaderFields? = null
+        private var docInfoFields: DirDocFields? = null
+        private var rootInfoFields: DirRootFields? = null
 
         @JvmStatic
         @BeforeInvocation
         fun beforeInvocation(callback: BeforeHookCallback) {
+            if (!PrefsManager.isPerFolderEnabled()) return
+
             val loader = callback.thisObject ?: return
 
             runCatching {
@@ -29,7 +33,6 @@ class DirectoryLoaderHooker : XposedInterface.Hooker {
                 log("DirectoryLoader: context set, key=${ctx.toKey()}")
             }.onFailure { e ->
                 log("DirectoryLoader: failed to extract context", e)
-                // Set virtual context so SortCursorHooker uses global prefs
                 FolderContextHolder.set(FolderContext.virtual())
             }
         }
@@ -43,98 +46,82 @@ class DirectoryLoaderHooker : XposedInterface.Hooker {
         private fun extractContext(loader: Any): FolderContext {
             val fields = getLoaderFields(loader.javaClass)
 
-            // Get mDoc (DocumentInfo, nullable)
             val doc = fields.mDoc.get(loader)
-
-            // Get mRoot (RootInfo)
             val root = fields.mRoot.get(loader)
 
-            // If mDoc is null, this is a virtual context (Recents, search, etc.)
-            if (doc == null) {
-                log("DirectoryLoader: mDoc is null, using virtual context")
-                return FolderContext.virtual()
-            }
+            if (doc == null) return FolderContext.virtual()
 
-            // Extract userId from DocumentInfo
-            val docUserIdField = doc.javaClass.getField("userId")
-            val docUserId = docUserIdField.get(doc)
-            val userId = extractUserId(docUserId)
+            val docFields = getDocInfoFields(doc.javaClass)
+            val userId = extractUserId(docFields.userId.get(doc))
+            val authority = docFields.authority.get(doc) as? String ?: FolderContext.NULL_MARKER
+            val documentId = docFields.documentId.get(doc) as? String ?: FolderContext.NULL_MARKER
 
-            // Extract authority and documentId from DocumentInfo
-            val authority = doc.javaClass.getField("authority").get(doc) as? String
-                ?: FolderContext.NULL_MARKER
-            val documentId = doc.javaClass.getField("documentId").get(doc) as? String
-                ?: FolderContext.NULL_MARKER
-
-            // Extract rootId from RootInfo
             val rootId =
-                if (root != null) {
-                    root.javaClass.getField("rootId").get(root) as? String
-                        ?: FolderContext.NULL_MARKER
-                } else {
-                    FolderContext.NULL_MARKER
-                }
+                root?.let {
+                    val rootFields = getRootInfoFields(it.javaClass)
+                    rootFields.rootId.get(it) as? String ?: FolderContext.NULL_MARKER
+                } ?: FolderContext.NULL_MARKER
 
-            // Check if this is a virtual root (Recents, etc.)
             val isVirtual = isVirtualRoot(root)
 
-            return FolderContext(
-                userId = userId,
-                authority = authority,
-                rootId = rootId,
-                documentId = documentId,
-                isVirtual = isVirtual,
-            )
+            return FolderContext(userId, authority, rootId, documentId, isVirtual)
         }
 
         private fun extractUserId(userIdObj: Any?): Int {
             if (userIdObj == null) return 0
-
-            // UserId class has getIdentifier() method or mUserId field
             return runCatching {
-                val method = userIdObj.javaClass.getMethod("getIdentifier")
-                method.invoke(userIdObj) as Int
-            }.getOrElse {
-                runCatching {
-                    val field = userIdObj.javaClass.getDeclaredField("mUserId")
-                    field.isAccessible = true
-                    field.getInt(userIdObj)
-                }.getOrDefault(0)
-            }
+                userIdObj.javaClass.getMethod("getIdentifier").invoke(userIdObj) as Int
+            }.getOrDefault(0)
         }
 
         private fun isVirtualRoot(root: Any?): Boolean {
             if (root == null) return true
-
-            return runCatching {
-                // Check root type - TYPE_RECENTS = 1
-                val derivedTypeField = root.javaClass.getField("derivedType")
-                val derivedType = derivedTypeField.getInt(root)
-                derivedType == 1 // TYPE_RECENTS
-            }.getOrDefault(false)
+            val rootFields = getRootInfoFields(root.javaClass)
+            return rootFields.derivedType.getInt(root) == 1
         }
 
-        private fun getLoaderFields(clazz: Class<*>): ReflectedLoaderFields =
+        private fun getLoaderFields(clazz: Class<*>): DirLoaderFields =
             loaderFields?.takeIf { it.clazz == clazz }
-                ?: ReflectedLoaderFields(
-                    clazz = clazz,
-                    mDoc =
-                        clazz.getDeclaredField("mDoc").apply {
-                            isAccessible = true
-                        },
-                    mRoot =
-                        clazz.getDeclaredField("mRoot").apply {
-                            isAccessible = true
-                        },
-                ).also { loaderFields = it }
+                ?: DirLoaderFields(
+                    clazz,
+                    clazz.getDeclaredField("mDoc").apply { isAccessible = true },
+                    clazz.getDeclaredField("mRoot").apply { isAccessible = true },
+                ).also {
+                    loaderFields =
+                        it
+                }
+
+        private fun getDocInfoFields(clazz: Class<*>): DirDocFields =
+            docInfoFields?.takeIf { it.clazz == clazz }
+                ?: DirDocFields(
+                    clazz,
+                    clazz.getField("userId"),
+                    clazz.getField("authority"),
+                    clazz.getField("documentId"),
+                ).also { docInfoFields = it }
+
+        private fun getRootInfoFields(clazz: Class<*>): DirRootFields =
+            rootInfoFields?.takeIf { it.clazz == clazz }
+                ?: DirRootFields(clazz, clazz.getField("rootId"), clazz.getField("derivedType"))
+                    .also { rootInfoFields = it }
     }
 }
 
-/**
- * Cached reflection fields for DirectoryLoader.
- */
-private data class ReflectedLoaderFields(
+private data class DirLoaderFields(
     val clazz: Class<*>,
     val mDoc: Field,
     val mRoot: Field,
+)
+
+private data class DirDocFields(
+    val clazz: Class<*>,
+    val userId: Field,
+    val authority: Field,
+    val documentId: Field,
+)
+
+private data class DirRootFields(
+    val clazz: Class<*>,
+    val rootId: Field,
+    val derivedType: Field,
 )

@@ -7,8 +7,8 @@ import android.os.Looper
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 
 /**
- * Hook-side preferences manager. Runs in DocumentsUI process and queries the module's
- * ContentProvider to fetch user settings. Uses invalidation-based caching.
+ * Preferences manager for the hook process. Runs in DocumentsUI and queries the module
+ * ContentProvider to fetch user settings. Uses invalidation based caching.
  */
 object PrefsManager {
     private val PROVIDER_URI: Uri =
@@ -20,15 +20,11 @@ object PrefsManager {
     @Volatile
     private var initialized: Boolean = false
 
-    /**
-     * Initialize the preferences manager. Call once on module load.
-     * Delays provider query to ensure Application context is available.
-     */
     fun init() {
-        // Immediate attempt (may fail if context not ready)
+        // Immediate attempt may fail if Application context not ready
         refreshFromProvider()
 
-        // Delayed retry to ensure context is available
+        // Delayed retry ensures context availability after system init
         Handler(Looper.getMainLooper()).postDelayed({
             refreshFromProvider()
             log("PrefsManager: delayed refresh complete, perFolderEnabled=$perFolderEnabled")
@@ -38,22 +34,14 @@ object PrefsManager {
         log("PrefsManager: initialized, perFolderEnabled=$perFolderEnabled")
     }
 
-    /**
-     * Invalidate the cache and refresh from provider.
-     * Call when settings may have changed.
-     */
     fun invalidateCache() {
         if (initialized) {
             refreshFromProvider()
         }
     }
 
-    /**
-     * Returns whether per-folder sort preferences are enabled.
-     * Attempts lazy refresh if provider query hasn't succeeded yet.
-     */
     fun isPerFolderEnabled(): Boolean {
-        // Lazy retry if initial query failed (context wasn't ready)
+        // Retry if initial query failed due to context not ready
         if (initialized && !providerQueried) {
             refreshFromProvider()
         }
@@ -90,7 +78,6 @@ object PrefsManager {
             }
         }.onFailure { e ->
             log("PrefsManager: failed to query provider", e)
-            // Keep previous value on failure
         }
     }
 

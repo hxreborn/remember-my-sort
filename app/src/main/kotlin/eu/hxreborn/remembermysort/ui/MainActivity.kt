@@ -32,7 +32,7 @@ class MainActivity : Activity() {
             TextView(this).apply {
                 text =
                     "When enabled, each folder remembers its own sort preference. " +
-                        "When disabled, all folders share one global sort preference (stock behavior)."
+                    "When disabled, all folders share one global sort preference (stock behavior)."
                 setPadding(0, 0, 0, 32)
             }
 

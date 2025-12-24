@@ -19,17 +19,13 @@ object AppPrefsHelper {
         getPrefs(this).edit().apply(block).apply()
     }
 
-    /**
-     * Returns whether per-folder sort preferences are enabled.
-     * When disabled, all folders use the global sort preference (stock behavior).
-     */
     fun isPerFolderEnabled(context: Context): Boolean =
         getPrefs(context).getBoolean(KEY_PER_FOLDER_ENABLED, false)
 
-    /**
-     * Sets whether per-folder sort preferences are enabled.
-     */
-    fun setPerFolderEnabled(context: Context, enabled: Boolean) {
+    fun setPerFolderEnabled(
+        context: Context,
+        enabled: Boolean,
+    ) {
         context.editPrefs { putBoolean(KEY_PER_FOLDER_ENABLED, enabled) }
     }
 }

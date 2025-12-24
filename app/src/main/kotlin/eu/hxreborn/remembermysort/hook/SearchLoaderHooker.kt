@@ -1,6 +1,6 @@
 package eu.hxreborn.remembermysort.hook
 
-import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
+import eu.hxreborn.remembermysort.prefs.PrefsManager
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedInterface.AfterHookCallback
 import io.github.libxposed.api.XposedInterface.BeforeHookCallback
@@ -9,11 +9,8 @@ import io.github.libxposed.api.annotations.BeforeInvocation
 import io.github.libxposed.api.annotations.XposedHooker
 
 /**
- * Hooks SearchLoader.loadInBackground() (Kotlin, search v2) to capture folder context.
- * Sets FolderContextHolder before the method runs, clears it after (even on exception).
- *
- * SearchLoader is used for multi-root search queries. Since it searches across multiple
- * roots, it always uses virtual/global context (per-folder prefs don't apply to search results).
+ * Hooks SearchLoader.loadInBackground. Uses virtual context since multi-root search
+ * lacks stable folder identity.
  */
 @XposedHooker
 class SearchLoaderHooker : XposedInterface.Hooker {
@@ -21,9 +18,8 @@ class SearchLoaderHooker : XposedInterface.Hooker {
         @JvmStatic
         @BeforeInvocation
         fun beforeInvocation(callback: BeforeHookCallback) {
-            // SearchLoader is multi-root search - always use global prefs
+            if (!PrefsManager.isPerFolderEnabled()) return
             FolderContextHolder.set(FolderContext.virtual())
-            log("SearchLoader: context set to virtual (multi-root search)")
         }
 
         @JvmStatic

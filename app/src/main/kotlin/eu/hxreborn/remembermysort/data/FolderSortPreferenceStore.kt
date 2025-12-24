@@ -27,15 +27,14 @@ internal object FolderSortPreferenceStore {
                 .forName("android.app.ActivityThread")
                 .getMethod("currentApplication")
                 .invoke(null) as? Context
-            )?.applicationContext
+        )?.applicationContext
             ?: error("Failed to get application context")
     }
 
-    // LRU cache: accessOrder=true means get() moves entry to end (most recently used)
     private val cache =
         object : LinkedHashMap<String, SortPreference>(MAX_ENTRIES, 0.75f, true) {
             override fun removeEldestEntry(eldest: Map.Entry<String, SortPreference>): Boolean {
-                // Don't auto-remove; we handle eviction manually to protect GLOBAL_KEY
+                // Manual eviction preserves GLOBAL_KEY from LRU removal
                 return false
             }
         }
@@ -45,9 +44,6 @@ internal object FolderSortPreferenceStore {
     @Volatile
     private var initialized = false
 
-    /**
-     * Initialize the store. Loads from disk and migrates old global file if needed.
-     */
     fun init() {
         if (initialized) return
         synchronized(lock) {
@@ -59,34 +55,26 @@ internal object FolderSortPreferenceStore {
         }
     }
 
-    /**
-     * Load preference for the given folder key.
-     * Falls back to global preference if no per-folder entry exists.
-     */
     fun load(folderKey: String): SortPreference {
         init()
         synchronized(lock) {
-            // Check per-folder cache first
             cache[folderKey]?.let {
                 log("FolderSort: loaded from per-folder, key=$folderKey")
                 return it
             }
         }
 
-        // Fallback to global
         val global = GlobalSortPreferenceStore.load()
         log("FolderSort: fallback to global for key=$folderKey")
         return global
     }
 
-    /**
-     * Persist preference for the given folder key.
-     * GLOBAL_KEY writes are delegated to GlobalSortPreferenceStore.
-     */
-    fun persist(folderKey: String, pref: SortPreference): Boolean {
+    fun persist(
+        folderKey: String,
+        pref: SortPreference,
+    ): Boolean {
         init()
 
-        // Delegate global key to GlobalSortPreferenceStore
         if (folderKey == FolderContext.GLOBAL_KEY) {
             log("FolderSort: delegating GLOBAL_KEY to GlobalSortPreferenceStore")
             return GlobalSortPreferenceStore.persist(pref)
@@ -113,9 +101,10 @@ internal object FolderSortPreferenceStore {
         if (oldFile.exists()) {
             val oldPref = GlobalSortPreferenceStore.load()
             if (oldPref != SortPreference.DEFAULT) {
-                // Migration note: the old global pref stays in GlobalSortPreferenceStore
-                // We don't copy it here - FolderSortPreferenceStore falls back to it naturally
-                log("FolderSort: migration complete, global pref preserved in GlobalSortPreferenceStore")
+                // Old global pref stays in GlobalSortPreferenceStore for fallback chain
+                log(
+                    "FolderSort: migration complete, global pref preserved in GlobalSortPreferenceStore",
+                )
             }
         }
 
@@ -168,9 +157,8 @@ internal object FolderSortPreferenceStore {
                 }
             }
 
-            // Atomic rename
             if (!tempFile.renameTo(targetFile)) {
-                // Fallback: copy and delete
+                // Atomic rename failed - fallback to copy+delete
                 tempFile.copyTo(targetFile, overwrite = true)
                 tempFile.delete()
             }
@@ -182,11 +170,11 @@ internal object FolderSortPreferenceStore {
     }
 
     private fun evictIfNeeded() {
-        // Remove oldest entries until under cap, but NEVER remove GLOBAL_KEY
         val iter = cache.entries.iterator()
         var evictedCount = 0
         while (cache.size > MAX_ENTRIES && iter.hasNext()) {
             val entry = iter.next()
+            // Preserve GLOBAL_KEY from LRU eviction
             if (entry.key != FolderContext.GLOBAL_KEY) {
                 iter.remove()
                 evictedCount++

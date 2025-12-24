@@ -15,11 +15,7 @@ import io.github.libxposed.api.annotations.BeforeInvocation
 import io.github.libxposed.api.annotations.XposedHooker
 
 /**
- * Hooks SortModel.sortCursor() to persist and restore sort preferences.
- *
- * When per-folder mode is enabled and FolderContextHolder has valid context,
- * uses FolderSortPreferenceStore for per-folder persistence.
- * Otherwise, uses GlobalSortPreferenceStore for stock behavior.
+ * Hooks SortModel.sortCursor to persist and restore sort preferences.
  */
 @XposedHooker
 class SortCursorHooker : XposedInterface.Hooker {
@@ -27,7 +23,6 @@ class SortCursorHooker : XposedInterface.Hooker {
         private var sortModelFields: ReflectedSortModel? = null
         private var dimensionFields: ReflectedDimension? = null
 
-        // Track what we last applied to detect real user changes vs navigation restores
         private var lastAppliedKey: String? = null
         private var lastAppliedPref: SortPreference? = null
 
@@ -40,24 +35,22 @@ class SortCursorHooker : XposedInterface.Hooker {
                 val fields = getSortModelFields(sortModel.javaClass)
                 val isUserSpecified = fields.isUserSpecified.getBoolean(sortModel)
 
-                // Get folder context from loader hook (may be null if loader hook didn't run)
                 val folderCtx = FolderContextHolder.get()
                 val usePerFolder = shouldUsePerFolder(folderCtx)
                 val currentKey = folderCtx?.toKey()
 
-                // Detect folder change - if we navigated to a new folder, apply saved sort
-                val folderChanged = usePerFolder && currentKey != null && currentKey != lastAppliedKey
+                val folderChanged =
+                    usePerFolder && currentKey != null && currentKey != lastAppliedKey
                 if (folderChanged) {
-                    log("SortCursor: folder changed from $lastAppliedKey to $currentKey, applying saved sort")
+                    log(
+                        "SortCursor: folder changed from $lastAppliedKey to $currentKey, applying saved sort",
+                    )
                     applyPersistedSort(sortModel, fields, folderCtx, usePerFolder)
                     return
                 }
 
                 if (isUserSpecified) {
-                    // Check if this is a real user change or just DocumentsUI restoring state
                     val currentPref = getCurrentSortPref(sortModel, fields)
-
-                    // Skip persist if this matches what we just applied
                     if (currentKey == lastAppliedKey && currentPref == lastAppliedPref) {
                         log("SortCursor: skip persist (matches applied), key=$currentKey")
                         return
@@ -90,10 +83,6 @@ class SortCursorHooker : XposedInterface.Hooker {
             return SortPreference(position, dimId, direction)
         }
 
-        /**
-         * Determine if we should use per-folder preferences.
-         * Requires: feature enabled AND valid non-virtual context.
-         */
         private fun shouldUsePerFolder(folderCtx: FolderContext?): Boolean {
             if (!PrefsManager.isPerFolderEnabled()) {
                 return false
@@ -116,7 +105,6 @@ class SortCursorHooker : XposedInterface.Hooker {
             if (usePerFolder && folderCtx != null) {
                 val key = folderCtx.toKey()
                 FolderSortPreferenceStore.persist(key, actualPref)
-                // Track what we persisted so we can detect re-navigation
                 lastAppliedKey = key
                 lastAppliedPref = actualPref
                 log("SortCursor: persisted to per-folder, key=$key, pref=$actualPref")
@@ -175,7 +163,6 @@ class SortCursorHooker : XposedInterface.Hooker {
             targetDimFields.sortDirection.setInt(targetDim, pref.direction)
             fields.sortedDimension.set(sortModel, targetDim)
 
-            // Track what we applied so we can detect navigation vs user changes
             if (usePerFolder && folderCtx != null) {
                 lastAppliedKey = folderCtx.toKey()
                 lastAppliedPref = pref
