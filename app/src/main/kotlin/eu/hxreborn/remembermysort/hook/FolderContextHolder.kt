@@ -4,6 +4,7 @@ package eu.hxreborn.remembermysort.hook
  * Thread-local holder for folder context during loader execution.
  */
 object FolderContextHolder {
+    // Valid because SortModel.sortCursor is called within the Loader's loadInBackground thread
     private val current = ThreadLocal<FolderContext?>()
 
     fun set(ctx: FolderContext?) {

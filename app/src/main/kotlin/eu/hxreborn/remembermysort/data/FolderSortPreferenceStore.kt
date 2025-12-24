@@ -22,6 +22,7 @@ private const val MAX_ENTRIES = 256
  */
 internal object FolderSortPreferenceStore {
     private val context: Context by lazy {
+        // Reflection hack to get Application Context since we don't have a direct reference
         (
             Class
                 .forName("android.app.ActivityThread")
@@ -143,6 +144,7 @@ internal object FolderSortPreferenceStore {
             val targetFile = File(context.filesDir, PREF_FILENAME)
 
             tempFile.bufferedWriter().use { writer ->
+                // I/O stays under the lock because the capped map is small and avoids snapshot copies
                 cache.forEach { (key, pref) ->
                     val json =
                         JSONObject().apply {

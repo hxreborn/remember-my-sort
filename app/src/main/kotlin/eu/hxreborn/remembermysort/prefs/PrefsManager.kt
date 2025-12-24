@@ -9,6 +9,7 @@ import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
  * ContentProvider to fetch user settings. Lazy one-shot fetch with retry on next call if failed.
  */
 object PrefsManager {
+    // IPC URI to fetch settings from the module's main process
     private val PROVIDER_URI: Uri =
         Uri.parse("content://${PrefsProvider.AUTHORITY}/per_folder_enabled")
 
@@ -54,6 +55,7 @@ object PrefsManager {
     @Suppress("PrivateApi")
     private fun getSystemContext(): Context? =
         runCatching {
+            // Reflection hack to get Application Context since we don't have a direct reference
             val activityThreadClass = Class.forName("android.app.ActivityThread")
             val method = activityThreadClass.getMethod("currentApplication")
             method.invoke(null) as? Context

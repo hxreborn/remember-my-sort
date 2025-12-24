@@ -14,6 +14,7 @@ private const val SERIALIZED_FIELD_COUNT = 3
  */
 internal object GlobalSortPreferenceStore {
     private val context: Context by lazy {
+        // Reflection hack to get Application Context since we don't have a direct reference
         (
             Class
                 .forName("android.app.ActivityThread")

@@ -24,10 +24,12 @@ import java.util.WeakHashMap
 @XposedHooker
 class SortCursorHooker : XposedInterface.Hooker {
     companion object {
+        // Write-once caches so races cause duplicate reflection not corruption
         private var sortModelFields: ReflectedSortModel? = null
         private var dimensionFields: ReflectedDimension? = null
 
-        // Per-instance state to prevent multi-window collisions
+        // Keyed by SortModel instance to prevent collisions in multi-window or split-screen
+        // WeakHashMap ensures state is cleared when the UI component is destroyed
         private val instanceState =
             Collections.synchronizedMap(WeakHashMap<Any, AppliedState>())
 
@@ -115,7 +117,7 @@ class SortCursorHooker : XposedInterface.Hooker {
 
             if (isUserSpecified) {
                 val pref = getCurrentSortPref(sortModel, fields) ?: return
-                // Skip if this matches what we just applied
+                // Echo prevention so ignore manual sort if it matches what we just programmatically applied
                 if (pref == state?.pref) {
                     if (DEBUG) log("SortCursor: skip persist (matches applied)")
                     return
@@ -199,6 +201,7 @@ class SortCursorHooker : XposedInterface.Hooker {
                             "SortCursor: dimId mismatch, pos=${pref.position} " +
                                 "expected=${pref.dimId} got=$actualDimId",
                         )
+                        // Fallback if dimension ID changed like OS update default to Date which is usually most relevant
                         findDateDimension(dimensions)
                     }
                 } ?: return

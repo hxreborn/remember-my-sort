@@ -76,6 +76,7 @@ class FolderLoaderHooker : XposedInterface.Hooker {
 
         private fun extractUserId(userIdObj: Any?): Int {
             if (userIdObj == null) return 0
+            // UserId class is hidden so use reflection to get the integer identifier
             return runCatching {
                 userIdObj.javaClass.getMethod("getIdentifier").invoke(userIdObj) as Int
             }.getOrDefault(0)
@@ -83,6 +84,7 @@ class FolderLoaderHooker : XposedInterface.Hooker {
 
         private fun isVirtualRoot(root: Any?): Boolean {
             if (root == null) return true
+            // derivedType == 1 corresponds to FLAG_ADVANCED or Recents in DocumentsUI
             return getRootInfoFields(root.javaClass).derivedType.getInt(root) == 1
         }
 
