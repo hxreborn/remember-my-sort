@@ -14,6 +14,8 @@ import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedInterface.BeforeHookCallback
 import io.github.libxposed.api.annotations.BeforeInvocation
 import io.github.libxposed.api.annotations.XposedHooker
+import java.util.Collections
+import java.util.WeakHashMap
 
 /**
  * Hooks SortModel.sortCursor to persist and restore sort preferences.
@@ -25,12 +27,14 @@ class SortCursorHooker : XposedInterface.Hooker {
         private var sortModelFields: ReflectedSortModel? = null
         private var dimensionFields: ReflectedDimension? = null
 
-        // Per-folder state - ONLY touched when per-folder is active
-        @Volatile
-        private var lastAppliedKey: String? = null
+        // Per-instance state to prevent multi-window collisions
+        private val instanceState =
+            Collections.synchronizedMap(WeakHashMap<Any, AppliedState>())
 
-        @Volatile
-        private var lastAppliedPref: SortPreference? = null
+        private data class AppliedState(
+            val key: String,
+            val pref: SortPreference,
+        )
 
         @JvmStatic
         @BeforeInvocation
@@ -101,21 +105,22 @@ class SortCursorHooker : XposedInterface.Hooker {
             ctx: FolderContext,
         ) {
             val currentKey = ctx.toKey()
+            val state = instanceState[sortModel]
 
             // Folder changed - apply saved sort for new folder
-            if (currentKey != lastAppliedKey) {
+            if (currentKey != state?.key) {
                 applyPerFolderSort(sortModel, fields, ctx)
                 return
             }
 
             if (isUserSpecified) {
                 val pref = getCurrentSortPref(sortModel, fields) ?: return
-                // Skip if this matches what we just applied (echo prevention)
-                if (pref == lastAppliedPref) {
+                // Skip if this matches what we just applied
+                if (pref == state?.pref) {
                     if (DEBUG) log("SortCursor: skip persist (matches applied)")
                     return
                 }
-                persistPerFolder(ctx, pref)
+                persistPerFolder(sortModel, ctx, pref)
             } else {
                 applyPerFolderSort(sortModel, fields, ctx)
             }
@@ -131,19 +136,18 @@ class SortCursorHooker : XposedInterface.Hooker {
             val pref = FolderSortPreferenceStore.load(key)
             if (pref.position < 0) return
             applyPrefToDimensions(sortModel, fields, dimensions, pref)
-            lastAppliedKey = key
-            lastAppliedPref = pref
+            instanceState[sortModel] = AppliedState(key, pref)
             if (DEBUG) log("SortCursor: applied per-folder, key=$key")
         }
 
         private fun persistPerFolder(
+            sortModel: Any,
             ctx: FolderContext,
             pref: SortPreference,
         ) {
             val key = ctx.toKey()
             FolderSortPreferenceStore.persist(key, pref)
-            lastAppliedKey = key
-            lastAppliedPref = pref
+            instanceState[sortModel] = AppliedState(key, pref)
             if (DEBUG) log("SortCursor: persisted per-folder, key=$key")
         }
 
