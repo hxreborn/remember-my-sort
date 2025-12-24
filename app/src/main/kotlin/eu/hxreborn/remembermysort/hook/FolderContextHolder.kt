@@ -1,10 +1,7 @@
 package eu.hxreborn.remembermysort.hook
 
-/**
- * Thread-local holder for folder context during loader execution.
- */
+/** Thread-local holder for folder context. Safe: sortCursor runs on Loader's background thread. */
 object FolderContextHolder {
-    // Valid because SortModel.sortCursor is called within the Loader's loadInBackground thread
     private val current = ThreadLocal<FolderContext?>()
 
     fun set(ctx: FolderContext?) {
@@ -52,5 +49,13 @@ data class FolderContext(
                 documentId = NULL_MARKER,
                 isVirtual = true,
             )
+
+        /** Extract user ID from UserId object via reflection (hidden API). */
+        fun extractUserId(userIdObj: Any?): Int =
+            userIdObj?.let {
+                runCatching {
+                    it.javaClass.getMethod("getIdentifier").invoke(it) as Int
+                }.getOrDefault(0)
+            } ?: 0
     }
 }

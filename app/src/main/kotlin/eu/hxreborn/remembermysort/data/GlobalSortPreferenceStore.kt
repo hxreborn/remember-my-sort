@@ -1,8 +1,8 @@
 package eu.hxreborn.remembermysort.data
 
-import android.content.Context
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import eu.hxreborn.remembermysort.model.SortPreference
+import eu.hxreborn.remembermysort.util.ContextHelper
 import java.io.File
 
 private const val PREF_FILENAME = "rms_pref"
@@ -13,29 +13,23 @@ private const val SERIALIZED_FIELD_COUNT = 3
  * This is the original/stock behavior - one sort preference for all folders.
  */
 internal object GlobalSortPreferenceStore {
-    private val context: Context by lazy {
-        // Reflection hack to get Application Context since we don't have a direct reference
-        (
-            Class
-                .forName("android.app.ActivityThread")
-                .getMethod("currentApplication")
-                .invoke(null) as? Context
-        )?.applicationContext
-            ?: error("Failed to get application context")
-    }
+    private val context by lazy { ContextHelper.applicationContext }
 
     @Volatile
     private var cached: SortPreference? = null
 
     fun persist(pref: SortPreference): Boolean {
         if (pref == cached) return false
-        runCatching {
+        return runCatching {
             File(context.filesDir, PREF_FILENAME)
                 .writeText("${pref.position}:${pref.dimId}:${pref.direction}")
             cached = pref
             log("Persist: pos=${pref.position}, dimId=${pref.dimId}, dir=${pref.direction}")
+            true
+        }.getOrElse { e ->
+            log("Persist failed", e)
+            false
         }
-        return true
     }
 
     fun load(): SortPreference =

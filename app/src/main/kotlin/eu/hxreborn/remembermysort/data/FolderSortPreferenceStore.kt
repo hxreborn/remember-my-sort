@@ -1,9 +1,9 @@
 package eu.hxreborn.remembermysort.data
 
-import android.content.Context
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import eu.hxreborn.remembermysort.hook.FolderContext
 import eu.hxreborn.remembermysort.model.SortPreference
+import eu.hxreborn.remembermysort.util.ContextHelper
 import org.json.JSONObject
 import java.io.File
 
@@ -12,97 +12,57 @@ private const val OLD_GLOBAL_FILE = "rms_pref"
 private const val MIGRATED_MARKER = "rms_migrated"
 private const val MAX_ENTRIES = 256
 
-/**
- * Per-folder sort preference store with LRU eviction.
- * Stores preferences keyed by folder (userId:authority:rootId:documentId).
- * Falls back to GlobalSortPreferenceStore when no per-folder entry exists.
- *
- * Storage format: JSON Lines (one entry per line for atomic append/parse)
- * Atomic writes: write to temp file, then rename
- */
 internal object FolderSortPreferenceStore {
-    private val context: Context by lazy {
-        // Reflection hack to get Application Context since we don't have a direct reference
-        (
-            Class
-                .forName("android.app.ActivityThread")
-                .getMethod("currentApplication")
-                .invoke(null) as? Context
-        )?.applicationContext
-            ?: error("Failed to get application context")
-    }
+    private val context by lazy { ContextHelper.applicationContext }
 
-    private val cache =
-        object : LinkedHashMap<String, SortPreference>(MAX_ENTRIES, 0.75f, true) {
-            override fun removeEldestEntry(eldest: Map.Entry<String, SortPreference>): Boolean {
-                // Manual eviction preserves GLOBAL_KEY from LRU removal
-                return false
-            }
-        }
-
+    private val cache = LinkedHashMap<String, SortPreference>(MAX_ENTRIES, 0.75f, true) // accessOrder=true for LRU
     private val lock = Any()
 
-    @Volatile
-    private var initialized = false
-
-    fun init() {
-        if (initialized) return
-        synchronized(lock) {
-            if (initialized) return
-            migrateIfNeeded()
-            loadFromDisk()
-            initialized = true
-            log("FolderSortPreferenceStore: initialized, ${cache.size} entries")
-        }
+    private val ensureInit: Unit by lazy {
+        migrateIfNeeded()
+        loadFromDisk()
+        log("FolderSortPreferenceStore: initialized, ${cache.size} entries")
     }
 
     fun load(folderKey: String): SortPreference {
-        init()
+        ensureInit
         synchronized(lock) {
             cache[folderKey]?.let {
                 log("FolderSort: loaded from per-folder, key=$folderKey")
                 return it
             }
         }
-
-        val global = GlobalSortPreferenceStore.load()
-        log("FolderSort: fallback to global for key=$folderKey")
-        return global
+        return GlobalSortPreferenceStore.load().also {
+            log("FolderSort: fallback to global for key=$folderKey")
+        }
     }
 
     fun persist(
         folderKey: String,
         pref: SortPreference,
     ): Boolean {
-        init()
-
         if (folderKey == FolderContext.GLOBAL_KEY) {
             log("FolderSort: delegating GLOBAL_KEY to GlobalSortPreferenceStore")
             return GlobalSortPreferenceStore.persist(pref)
         }
 
+        ensureInit
         synchronized(lock) {
-            val existing = cache[folderKey]
-            if (existing == pref) return false
-
+            if (cache[folderKey] == pref) return false
             cache[folderKey] = pref
             evictIfNeeded()
             writeToDiskLocked()
         }
-
         log("FolderSort: persisted to per-folder, key=$folderKey, pref=$pref")
         return true
     }
 
     private fun migrateIfNeeded() {
-        val markerFile = File(context.filesDir, MIGRATED_MARKER)
-        if (markerFile.exists()) return
+        val markerFile =
+            File(context.filesDir, MIGRATED_MARKER).takeUnless { it.exists() } ?: return
 
-        val oldFile = File(context.filesDir, OLD_GLOBAL_FILE)
-        if (oldFile.exists()) {
-            val oldPref = GlobalSortPreferenceStore.load()
-            if (oldPref != SortPreference.DEFAULT) {
-                // Old global pref stays in GlobalSortPreferenceStore for fallback chain
+        File(context.filesDir, OLD_GLOBAL_FILE).takeIf { it.exists() }?.let {
+            GlobalSortPreferenceStore.load().takeIf { it != SortPreference.DEFAULT }?.let {
                 log(
                     "FolderSort: migration complete, global pref preserved in GlobalSortPreferenceStore",
                 )
@@ -113,28 +73,23 @@ internal object FolderSortPreferenceStore {
     }
 
     private fun loadFromDisk() {
-        val file = File(context.filesDir, PREF_FILENAME)
-        if (!file.exists()) return
-
-        runCatching {
-            file.readLines().forEach { line ->
-                if (line.isBlank()) return@forEach
-                runCatching {
-                    val json = JSONObject(line)
-                    val key = json.getString("key")
-                    val pref =
-                        SortPreference(
-                            position = json.getInt("pos"),
-                            dimId = json.getInt("dimId"),
-                            direction = json.getInt("dir"),
-                        )
-                    cache[key] = pref
-                }.onFailure { log("FolderSort: failed to parse line: $line") }
-            }
-            log("FolderSort: loaded ${cache.size} entries from disk")
-        }.onFailure { e ->
-            log("FolderSort: failed to load from disk", e)
-        }
+        File(context.filesDir, PREF_FILENAME)
+            .takeIf { it.exists() }
+            ?.runCatching {
+                readLines().filter { it.isNotBlank() }.forEach { line ->
+                    runCatching {
+                        JSONObject(line).let { json ->
+                            cache[json.getString("key")] =
+                                SortPreference(
+                                    position = json.getInt("pos"),
+                                    dimId = json.getInt("dimId"),
+                                    direction = json.getInt("dir"),
+                                )
+                        }
+                    }.onFailure { log("FolderSort: failed to parse line: $line") }
+                }
+                log("FolderSort: loaded ${cache.size} entries from disk")
+            }?.onFailure { e -> log("FolderSort: failed to load from disk", e) }
     }
 
     // Caller must hold lock
@@ -170,24 +125,9 @@ internal object FolderSortPreferenceStore {
         }
     }
 
-    private fun evictIfNeeded() {
-        if (cache.size <= MAX_ENTRIES) return
-
-        val toEvict = cache.size - MAX_ENTRIES
-        val iter = cache.entries.iterator()
-        var evictedCount = 0
-
-        while (evictedCount < toEvict && iter.hasNext()) {
-            val entry = iter.next()
-            // Preserve GLOBAL_KEY from LRU eviction
-            if (entry.key != FolderContext.GLOBAL_KEY) {
-                iter.remove()
-                evictedCount++
-            }
+    private fun evictIfNeeded() =
+        (cache.size - MAX_ENTRIES).takeIf { it > 0 }?.let { excess ->
+            cache.keys.take(excess).forEach { cache.remove(it) }
+            log("FolderSort: evicted $excess oldest entries")
         }
-
-        if (evictedCount > 0) {
-            log("FolderSort: evicted $evictedCount oldest entries")
-        }
-    }
 }

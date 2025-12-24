@@ -1,15 +1,14 @@
 package eu.hxreborn.remembermysort.prefs
 
-import android.content.Context
 import android.net.Uri
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
+import eu.hxreborn.remembermysort.util.ContextHelper
 
 /**
  * Preferences manager for the hook process. Runs in DocumentsUI and queries the module
  * ContentProvider to fetch user settings. Lazy one-shot fetch with retry on next call if failed.
  */
 object PrefsManager {
-    // IPC URI to fetch settings from the module's main process
     private val PROVIDER_URI: Uri =
         Uri.parse("content://${PrefsProvider.AUTHORITY}/per_folder_enabled")
 
@@ -35,10 +34,9 @@ object PrefsManager {
         if (providerQueried) return
 
         runCatching {
-            val context = getSystemContext() ?: return
             val cursor =
-                context.contentResolver.query(PROVIDER_URI, null, null, null, null)
-                    ?: return
+                ContextHelper.applicationContext.contentResolver
+                    .query(PROVIDER_URI, null, null, null, null) ?: return
 
             cursor.use { c ->
                 if (c.moveToFirst()) {
@@ -51,13 +49,4 @@ object PrefsManager {
             log("PrefsManager: failed to query provider", e)
         }
     }
-
-    @Suppress("PrivateApi")
-    private fun getSystemContext(): Context? =
-        runCatching {
-            // Reflection hack to get Application Context since we don't have a direct reference
-            val activityThreadClass = Class.forName("android.app.ActivityThread")
-            val method = activityThreadClass.getMethod("currentApplication")
-            method.invoke(null) as? Context
-        }.getOrNull()
 }

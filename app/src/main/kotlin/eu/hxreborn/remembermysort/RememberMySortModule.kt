@@ -65,9 +65,9 @@ class RememberMySortModule(
             val method = loaderClass.getDeclaredMethod(LOAD_IN_BACKGROUND_METHOD)
             hook(method, hooker)
             log("Hooked $className")
-        }.onFailure {
+        }.onFailure { e ->
             // Class may not exist on some OEM/Play builds - fallback to global prefs
-            log("$className not found, skipping (OEM variant?)")
+            log("$className not found, skipping (OEM variant?)", e)
         }
     }
 

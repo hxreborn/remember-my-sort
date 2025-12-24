@@ -2,6 +2,8 @@ package eu.hxreborn.remembermysort.hook
 
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import eu.hxreborn.remembermysort.prefs.PrefsManager
+import eu.hxreborn.remembermysort.util.accessibleField
+import eu.hxreborn.remembermysort.util.getStringOrMarker
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedInterface.AfterHookCallback
 import io.github.libxposed.api.XposedInterface.BeforeHookCallback
@@ -9,6 +11,8 @@ import io.github.libxposed.api.annotations.AfterInvocation
 import io.github.libxposed.api.annotations.BeforeInvocation
 import io.github.libxposed.api.annotations.XposedHooker
 import java.lang.reflect.Field
+
+private const val DERIVED_TYPE_RECENTS = 1
 
 /**
  * Hooks DirectoryLoader.loadInBackground to capture folder context.
@@ -45,53 +49,37 @@ class DirectoryLoaderHooker : XposedInterface.Hooker {
 
         private fun extractContext(loader: Any): FolderContext {
             val fields = getLoaderFields(loader.javaClass)
-
-            val doc = fields.mDoc.get(loader)
+            val doc = fields.mDoc.get(loader) ?: return FolderContext.virtual()
             val root = fields.mRoot.get(loader)
 
-            if (doc == null) return FolderContext.virtual()
-
             val docFields = getDocInfoFields(doc.javaClass)
-            val userId = extractUserId(docFields.userId.get(doc))
-            val authority = docFields.authority.get(doc) as? String ?: FolderContext.NULL_MARKER
-            val documentId = docFields.documentId.get(doc) as? String ?: FolderContext.NULL_MARKER
-
             val rootId =
-                root?.let {
-                    val rootFields = getRootInfoFields(it.javaClass)
-                    rootFields.rootId.get(it) as? String ?: FolderContext.NULL_MARKER
-                } ?: FolderContext.NULL_MARKER
+                root?.let { getRootInfoFields(it.javaClass).rootId.getStringOrMarker(it) }
+                    ?: FolderContext.NULL_MARKER
 
-            val isVirtual = isVirtualRoot(root)
-
-            return FolderContext(userId, authority, rootId, documentId, isVirtual)
+            return FolderContext(
+                userId = FolderContext.extractUserId(docFields.userId.get(doc)),
+                authority = docFields.authority.getStringOrMarker(doc),
+                rootId = rootId,
+                documentId = docFields.documentId.getStringOrMarker(doc),
+                isVirtual = isVirtualRoot(root),
+            )
         }
 
-        private fun extractUserId(userIdObj: Any?): Int {
-            if (userIdObj == null) return 0
-            // UserId class is hidden so use reflection to get the integer identifier
-            return runCatching {
-                userIdObj.javaClass.getMethod("getIdentifier").invoke(userIdObj) as Int
-            }.getOrDefault(0)
-        }
-
-        private fun isVirtualRoot(root: Any?): Boolean {
-            if (root == null) return true
-            val rootFields = getRootInfoFields(root.javaClass)
-            // derivedType == 1 corresponds to FLAG_ADVANCED or Recents in DocumentsUI
-            return rootFields.derivedType.getInt(root) == 1
-        }
+        private fun isVirtualRoot(root: Any?): Boolean =
+            root?.let {
+                getRootInfoFields(it.javaClass).derivedType.getInt(it) ==
+                    DERIVED_TYPE_RECENTS
+            }
+                ?: true
 
         private fun getLoaderFields(clazz: Class<*>): DirLoaderFields =
             loaderFields?.takeIf { it.clazz == clazz }
                 ?: DirLoaderFields(
                     clazz,
-                    clazz.getDeclaredField("mDoc").apply { isAccessible = true },
-                    clazz.getDeclaredField("mRoot").apply { isAccessible = true },
-                ).also {
-                    loaderFields =
-                        it
-                }
+                    clazz.accessibleField("mDoc"),
+                    clazz.accessibleField("mRoot"),
+                ).also { loaderFields = it }
 
         private fun getDocInfoFields(clazz: Class<*>): DirDocFields =
             docInfoFields?.takeIf { it.clazz == clazz }

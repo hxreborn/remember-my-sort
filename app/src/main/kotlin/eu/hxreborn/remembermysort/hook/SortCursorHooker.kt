@@ -10,6 +10,7 @@ import eu.hxreborn.remembermysort.model.ReflectedSortModel
 import eu.hxreborn.remembermysort.model.Sort
 import eu.hxreborn.remembermysort.model.SortPreference
 import eu.hxreborn.remembermysort.prefs.PrefsManager
+import eu.hxreborn.remembermysort.util.accessibleField
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedInterface.BeforeHookCallback
 import io.github.libxposed.api.annotations.BeforeInvocation
@@ -24,14 +25,11 @@ import java.util.WeakHashMap
 @XposedHooker
 class SortCursorHooker : XposedInterface.Hooker {
     companion object {
-        // Write-once caches so races cause duplicate reflection not corruption
         private var sortModelFields: ReflectedSortModel? = null
         private var dimensionFields: ReflectedDimension? = null
 
-        // Keyed by SortModel instance to prevent collisions in multi-window or split-screen
-        // WeakHashMap ensures state is cleared when the UI component is destroyed
-        private val instanceState =
-            Collections.synchronizedMap(WeakHashMap<Any, AppliedState>())
+        // WeakHashMap keyed by SortModel instance to avoid cross-window collisions and auto-clear with UI lifecycle
+        private val instanceState = Collections.synchronizedMap(WeakHashMap<Any, AppliedState>())
 
         private data class AppliedState(
             val key: String,
@@ -51,13 +49,11 @@ class SortCursorHooker : XposedInterface.Hooker {
             val isUserSpecified = fields.isUserSpecified.getBoolean(sortModel)
             val ctx = FolderContextHolder.get()
 
-            // GATE: Route to global if per-folder not applicable
             if (!shouldUsePerFolder(ctx)) {
                 handleGlobalPath(sortModel, fields, isUserSpecified)
                 return
             }
 
-            // PER-FOLDER PATH - wrapped in try/catch, falls back to global on failure
             try {
                 handlePerFolderPath(sortModel, fields, isUserSpecified, ctx!!)
             } catch (e: Exception) {
@@ -70,8 +66,6 @@ class SortCursorHooker : XposedInterface.Hooker {
             PrefsManager.isPerFolderEnabled() &&
                 ctx != null &&
                 !ctx.isVirtual
-
-        // ========== GLOBAL PATH (v1.x behavior, no lastApplied* touched) ==========
 
         private fun handleGlobalPath(
             sortModel: Any,
@@ -98,8 +92,6 @@ class SortCursorHooker : XposedInterface.Hooker {
             if (DEBUG) log("SortCursor: applied global")
         }
 
-        // ========== PER-FOLDER PATH ==========
-
         private fun handlePerFolderPath(
             sortModel: Any,
             fields: ReflectedSortModel,
@@ -109,7 +101,6 @@ class SortCursorHooker : XposedInterface.Hooker {
             val currentKey = ctx.toKey()
             val state = instanceState[sortModel]
 
-            // Folder changed - apply saved sort for new folder
             if (currentKey != state?.key) {
                 applyPerFolderSort(sortModel, fields, ctx)
                 return
@@ -152,8 +143,6 @@ class SortCursorHooker : XposedInterface.Hooker {
             instanceState[sortModel] = AppliedState(key, pref)
             if (DEBUG) log("SortCursor: persisted per-folder, key=$key")
         }
-
-        // ========== SHARED HELPERS ==========
 
         private fun getCurrentSortPref(
             sortModel: Any,
@@ -224,42 +213,20 @@ class SortCursorHooker : XposedInterface.Hooker {
                 }
             }
 
-        // ========== REFLECTION CACHING ==========
-
         private fun getSortModelFields(clazz: Class<*>): ReflectedSortModel =
-            sortModelFields?.takeIf { it.clazz == clazz }
-                ?: ReflectedSortModel(
-                    clazz = clazz,
-                    isUserSpecified =
-                        clazz.getDeclaredField("mIsUserSpecified").apply {
-                            isAccessible = true
-                        },
-                    dimensions =
-                        clazz.getDeclaredField("mDimensions").apply {
-                            isAccessible = true
-                        },
-                    sortedDimension =
-                        clazz.getDeclaredField("mSortedDimension").apply {
-                            isAccessible = true
-                        },
-                ).also { sortModelFields = it }
+            sortModelFields?.takeIf { it.clazz == clazz } ?: ReflectedSortModel(
+                clazz = clazz,
+                isUserSpecified = clazz.accessibleField("mIsUserSpecified"),
+                dimensions = clazz.accessibleField("mDimensions"),
+                sortedDimension = clazz.accessibleField("mSortedDimension"),
+            ).also { sortModelFields = it }
 
         private fun getDimensionFields(clazz: Class<*>): ReflectedDimension =
-            dimensionFields?.takeIf { it.clazz == clazz }
-                ?: ReflectedDimension(
-                    clazz = clazz,
-                    id =
-                        clazz.getDeclaredField("mId").apply {
-                            isAccessible = true
-                        },
-                    sortDirection =
-                        clazz.getDeclaredField("mSortDirection").apply {
-                            isAccessible = true
-                        },
-                    defaultSortDirection =
-                        clazz.getDeclaredField("mDefaultSortDirection").apply {
-                            isAccessible = true
-                        },
-                ).also { dimensionFields = it }
+            dimensionFields?.takeIf { it.clazz == clazz } ?: ReflectedDimension(
+                clazz = clazz,
+                id = clazz.accessibleField("mId"),
+                sortDirection = clazz.accessibleField("mSortDirection"),
+                defaultSortDirection = clazz.accessibleField("mDefaultSortDirection"),
+            ).also { dimensionFields = it }
     }
 }

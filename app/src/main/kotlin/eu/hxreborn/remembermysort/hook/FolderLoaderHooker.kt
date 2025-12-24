@@ -2,6 +2,8 @@ package eu.hxreborn.remembermysort.hook
 
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import eu.hxreborn.remembermysort.prefs.PrefsManager
+import eu.hxreborn.remembermysort.util.accessibleField
+import eu.hxreborn.remembermysort.util.getStringOrMarker
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedInterface.AfterHookCallback
 import io.github.libxposed.api.XposedInterface.BeforeHookCallback
@@ -9,6 +11,8 @@ import io.github.libxposed.api.annotations.AfterInvocation
 import io.github.libxposed.api.annotations.BeforeInvocation
 import io.github.libxposed.api.annotations.XposedHooker
 import java.lang.reflect.Field
+
+private const val DERIVED_TYPE_RECENTS = 1
 
 /**
  * Hooks FolderLoader.loadInBackground to capture folder context.
@@ -30,7 +34,8 @@ class FolderLoaderHooker : XposedInterface.Hooker {
                 val ctx = extractContext(loader)
                 FolderContextHolder.set(ctx)
                 log("FolderLoader: context set, key=${ctx.toKey()}")
-            }.onFailure {
+            }.onFailure { e ->
+                log("FolderLoader: failed to extract context", e)
                 FolderContextHolder.set(FolderContext.virtual())
             }
         }
@@ -43,64 +48,54 @@ class FolderLoaderHooker : XposedInterface.Hooker {
 
         private fun extractContext(loader: Any): FolderContext {
             val fields = getLoaderFields(loader.javaClass)
-            val doc = fields.mListedDir.get(loader)
             val root = fields.mRoot.get(loader)
-
-            if (doc == null) return extractFromRoot(root)
+            val doc = fields.mListedDir.get(loader) ?: return extractFromRoot(root)
 
             val docFields = getDocInfoFields(doc.javaClass)
-            val userId = extractUserId(docFields.userId.get(doc))
-            val authority = docFields.authority.get(doc) as? String ?: FolderContext.NULL_MARKER
-            val documentId = docFields.documentId.get(doc) as? String ?: FolderContext.NULL_MARKER
-
             val rootId =
-                root?.let {
-                    getRootInfoFields(it.javaClass).rootId.get(it) as? String
-                } ?: FolderContext.NULL_MARKER
+                root?.let { getRootInfoFields(it.javaClass).rootId.getStringOrMarker(it) }
+                    ?: FolderContext.NULL_MARKER
 
-            return FolderContext(userId, authority, rootId, documentId, isVirtualRoot(root))
+            return FolderContext(
+                userId = FolderContext.extractUserId(docFields.userId.get(doc)),
+                authority = docFields.authority.getStringOrMarker(doc),
+                rootId = rootId,
+                documentId = docFields.documentId.getStringOrMarker(doc),
+                isVirtual = isVirtualRoot(root),
+            )
         }
 
-        private fun extractFromRoot(root: Any?): FolderContext {
-            if (root == null) return FolderContext.virtual()
-            return runCatching {
-                val fields = getRootInfoFields(root.javaClass)
-                val userId = extractUserId(fields.userId?.get(root))
-                val authority = fields.authority?.get(root) as? String ?: FolderContext.NULL_MARKER
-                val rootId = fields.rootId.get(root) as? String ?: FolderContext.NULL_MARKER
-                val documentId =
-                    fields.documentId?.get(root) as? String ?: FolderContext.NULL_MARKER
-                FolderContext(userId, authority, rootId, documentId, isVirtualRoot(root))
-            }.getOrElse { FolderContext.virtual() }
-        }
+        private fun extractFromRoot(root: Any?): FolderContext =
+            root
+                ?.runCatching {
+                    val fields = getRootInfoFields(javaClass)
+                    FolderContext(
+                        userId = FolderContext.extractUserId(fields.userId?.get(this)),
+                        authority =
+                            fields.authority?.getStringOrMarker(this) ?: FolderContext.NULL_MARKER,
+                        rootId = fields.rootId.getStringOrMarker(this),
+                        documentId =
+                            fields.documentId?.getStringOrMarker(
+                                this,
+                            ) ?: FolderContext.NULL_MARKER,
+                        isVirtual = isVirtualRoot(this),
+                    )
+                }?.getOrNull() ?: FolderContext.virtual()
 
-        private fun extractUserId(userIdObj: Any?): Int {
-            if (userIdObj == null) return 0
-            // UserId class is hidden so use reflection to get the integer identifier
-            return runCatching {
-                userIdObj.javaClass.getMethod("getIdentifier").invoke(userIdObj) as Int
-            }.getOrDefault(0)
-        }
-
-        private fun isVirtualRoot(root: Any?): Boolean {
-            if (root == null) return true
-            // derivedType == 1 corresponds to FLAG_ADVANCED or Recents in DocumentsUI
-            return getRootInfoFields(root.javaClass).derivedType.getInt(root) == 1
-        }
+        private fun isVirtualRoot(root: Any?): Boolean =
+            root?.let {
+                getRootInfoFields(it.javaClass).derivedType.getInt(it) ==
+                    DERIVED_TYPE_RECENTS
+            }
+                ?: true
 
         private fun getLoaderFields(clazz: Class<*>): FolderLoaderFields =
             loaderFields?.takeIf { it.clazz == clazz }
                 ?: FolderLoaderFields(
                     clazz,
-                    clazz.getDeclaredField("mListedDir").apply {
-                        isAccessible =
-                            true
-                    },
-                    clazz.getDeclaredField("mRoot").apply { isAccessible = true },
-                ).also {
-                    loaderFields =
-                        it
-                }
+                    clazz.accessibleField("mListedDir"),
+                    clazz.accessibleField("mRoot"),
+                ).also { loaderFields = it }
 
         private fun getDocInfoFields(clazz: Class<*>): FolderDocFields =
             docInfoFields?.takeIf { it.clazz == clazz }
@@ -112,18 +107,14 @@ class FolderLoaderHooker : XposedInterface.Hooker {
                 ).also { docInfoFields = it }
 
         private fun getRootInfoFields(clazz: Class<*>): FolderRootFields =
-            rootInfoFields?.takeIf { it.clazz == clazz }
-                ?: FolderRootFields(
-                    clazz,
-                    clazz.getField("rootId"),
-                    clazz.getField("derivedType"),
-                    runCatching { clazz.getField("userId") }.getOrNull(),
-                    runCatching { clazz.getField("authority") }.getOrNull(),
-                    runCatching { clazz.getField("documentId") }.getOrNull(),
-                ).also {
-                    rootInfoFields =
-                        it
-                }
+            rootInfoFields?.takeIf { it.clazz == clazz } ?: FolderRootFields(
+                clazz = clazz,
+                rootId = clazz.getField("rootId"),
+                derivedType = clazz.getField("derivedType"),
+                userId = runCatching { clazz.getField("userId") }.getOrNull(),
+                authority = runCatching { clazz.getField("authority") }.getOrNull(),
+                documentId = runCatching { clazz.getField("documentId") }.getOrNull(),
+            ).also { rootInfoFields = it }
     }
 }
 
