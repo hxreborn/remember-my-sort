@@ -8,7 +8,11 @@ import java.io.File
 private const val PREF_FILENAME = "rms_pref"
 private const val SERIALIZED_FIELD_COUNT = 3
 
-internal object SortPreferenceStore {
+/**
+ * Global sort preference store. Used as fallback when per-folder preference doesn't exist.
+ * This is the original/stock behavior - one sort preference for all folders.
+ */
+internal object GlobalSortPreferenceStore {
     private val context: Context by lazy {
         (
             Class

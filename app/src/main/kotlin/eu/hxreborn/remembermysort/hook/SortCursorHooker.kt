@@ -2,7 +2,7 @@ package eu.hxreborn.remembermysort.hook
 
 import android.util.SparseArray
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
-import eu.hxreborn.remembermysort.data.SortPreferenceStore
+import eu.hxreborn.remembermysort.data.GlobalSortPreferenceStore
 import eu.hxreborn.remembermysort.model.ReflectedDimension
 import eu.hxreborn.remembermysort.model.ReflectedSortModel
 import eu.hxreborn.remembermysort.model.Sort
@@ -53,7 +53,7 @@ class SortCursorHooker : XposedInterface.Hooker {
                     .firstOrNull { dimensions.valueAt(it) === currentDim }
                     ?: return
 
-            SortPreferenceStore.persist(SortPreference(position, dimId, direction))
+            GlobalSortPreferenceStore.persist(SortPreference(position, dimId, direction))
         }
 
         private fun applyPersistedSort(
@@ -61,7 +61,7 @@ class SortCursorHooker : XposedInterface.Hooker {
             fields: ReflectedSortModel,
         ) {
             val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return
-            val pref = SortPreferenceStore.load()
+            val pref = GlobalSortPreferenceStore.load()
             if (pref.position < 0) return
 
             val positionValid = pref.position in 0 until dimensions.size()
