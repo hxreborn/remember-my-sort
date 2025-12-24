@@ -2,6 +2,8 @@ package eu.hxreborn.remembermysort.prefs
 
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 
 /**
@@ -20,9 +22,18 @@ object PrefsManager {
 
     /**
      * Initialize the preferences manager. Call once on module load.
+     * Delays provider query to ensure Application context is available.
      */
     fun init() {
+        // Immediate attempt (may fail if context not ready)
         refreshFromProvider()
+
+        // Delayed retry to ensure context is available
+        Handler(Looper.getMainLooper()).postDelayed({
+            refreshFromProvider()
+            log("PrefsManager: delayed refresh complete, perFolderEnabled=$perFolderEnabled")
+        }, 1000)
+
         initialized = true
         log("PrefsManager: initialized, perFolderEnabled=$perFolderEnabled")
     }
@@ -39,19 +50,44 @@ object PrefsManager {
 
     /**
      * Returns whether per-folder sort preferences are enabled.
+     * Attempts lazy refresh if provider query hasn't succeeded yet.
      */
-    fun isPerFolderEnabled(): Boolean = perFolderEnabled
+    fun isPerFolderEnabled(): Boolean {
+        // Lazy retry if initial query failed (context wasn't ready)
+        if (initialized && !providerQueried) {
+            refreshFromProvider()
+        }
+        return perFolderEnabled
+    }
+
+    @Volatile
+    private var providerQueried: Boolean = false
 
     @Synchronized
     private fun refreshFromProvider() {
         runCatching {
-            val context = getSystemContext() ?: return
-            context.contentResolver.query(PROVIDER_URI, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    perFolderEnabled = cursor.getInt(0) == 1
+            val context = getSystemContext()
+            if (context == null) {
+                log("PrefsManager: context is null, cannot query provider")
+                return
+            }
+            log("PrefsManager: querying provider from ${context.packageName}...")
+
+            val cursor = context.contentResolver.query(PROVIDER_URI, null, null, null, null)
+            if (cursor == null) {
+                log("PrefsManager: query returned null cursor")
+                return
+            }
+
+            cursor.use { c ->
+                if (c.moveToFirst()) {
+                    perFolderEnabled = c.getInt(0) == 1
+                    providerQueried = true
+                    log("PrefsManager: refreshed, perFolderEnabled=$perFolderEnabled")
+                } else {
+                    log("PrefsManager: cursor is empty")
                 }
             }
-            log("PrefsManager: refreshed, perFolderEnabled=$perFolderEnabled")
         }.onFailure { e ->
             log("PrefsManager: failed to query provider", e)
             // Keep previous value on failure

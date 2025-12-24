@@ -11,7 +11,8 @@
         <provider
             android:name=".prefs.PrefsProvider"
             android:authorities="eu.hxreborn.remembermysort.prefs"
-            android:exported="true" />
+            android:exported="true"
+            android:grantUriPermissions="true" />
 
         <!-- Settings activity for toggling per-folder feature -->
         <activity
