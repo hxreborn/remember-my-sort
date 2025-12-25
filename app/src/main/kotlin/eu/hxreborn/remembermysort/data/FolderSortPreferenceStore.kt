@@ -1,7 +1,6 @@
 package eu.hxreborn.remembermysort.data
 
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
-import eu.hxreborn.remembermysort.hook.FolderContext
 import eu.hxreborn.remembermysort.model.SortPreference
 import eu.hxreborn.remembermysort.util.ContextHelper
 import org.json.JSONObject
@@ -37,11 +36,6 @@ internal object FolderSortPreferenceStore {
         folderKey: String,
         pref: SortPreference,
     ): Boolean {
-        if (folderKey == FolderContext.GLOBAL_KEY) {
-            log("FolderSort: delegating GLOBAL_KEY to GlobalSortPreferenceStore")
-            return GlobalSortPreferenceStore.persist(pref)
-        }
-
         ensureInit
         synchronized(lock) {
             if (cache[folderKey] == pref) return false

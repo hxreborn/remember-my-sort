@@ -15,9 +15,9 @@ class RememberMySortApp : Application() {
                     listeners.forEach { it.onServiceBind(xposedService) }
                 }
 
-                override fun onServiceDied(svc: XposedService) {
+                override fun onServiceDied(xposedService: XposedService) {
                     service = null
-                    listeners.forEach { it.onServiceDied(svc) }
+                    listeners.forEach { it.onServiceDied(xposedService) }
                 }
             },
         )

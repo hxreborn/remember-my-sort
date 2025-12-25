@@ -1,7 +1,6 @@
 package eu.hxreborn.remembermysort.hook
 
 import android.util.SparseArray
-import eu.hxreborn.remembermysort.RememberMySortModule.Companion.DEBUG
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import eu.hxreborn.remembermysort.data.FolderSortPreferenceStore
 import eu.hxreborn.remembermysort.data.GlobalSortPreferenceStore
@@ -58,23 +57,28 @@ class SortCursorHooker : XposedInterface.Hooker {
             }
         }
 
+        private const val GLOBAL_STATE_KEY = "::GLOBAL::"
+
         private fun shouldUsePerFolder(ctx: FolderContext?): Boolean =
-            PrefsManager.isPerFolderEnabled() &&
-                ctx != null &&
-                !ctx.isVirtual
+            PrefsManager.isPerFolderEnabled() && ctx != null && !ctx.isRoot
 
         private fun handleGlobalPath(
             sortModel: Any,
             fields: ReflectedSortModel,
             isUserSpecified: Boolean,
         ) {
-            if (isUserSpecified) {
-                val pref = getCurrentSortPref(sortModel, fields) ?: return
-                GlobalSortPreferenceStore.persist(pref)
-                if (DEBUG) log("SortCursor: persisted global")
-            } else {
+            val state = instanceState[sortModel]
+            val transitionedToGlobal = state?.key != null && state.key != GLOBAL_STATE_KEY
+
+            if (transitionedToGlobal || !isUserSpecified) {
                 applyGlobalSort(sortModel, fields)
+                return
             }
+
+            val pref = getCurrentSortPref(sortModel, fields) ?: return
+            if (pref == state?.pref) return
+            GlobalSortPreferenceStore.persist(pref)
+            instanceState[sortModel] = AppliedState(GLOBAL_STATE_KEY, pref)
         }
 
         private fun applyGlobalSort(
@@ -85,7 +89,7 @@ class SortCursorHooker : XposedInterface.Hooker {
             val pref = GlobalSortPreferenceStore.load()
             if (pref.position < 0) return
             applyPrefToDimensions(sortModel, fields, dimensions, pref)
-            if (DEBUG) log("SortCursor: applied global")
+            instanceState[sortModel] = AppliedState(GLOBAL_STATE_KEY, pref)
         }
 
         private fun handlePerFolderPath(
@@ -104,11 +108,8 @@ class SortCursorHooker : XposedInterface.Hooker {
 
             if (isUserSpecified) {
                 val pref = getCurrentSortPref(sortModel, fields) ?: return
-                // Echo prevention so ignore manual sort if it matches what we just programmatically applied
-                if (pref == state?.pref) {
-                    if (DEBUG) log("SortCursor: skip persist (matches applied)")
-                    return
-                }
+                // Skip if user selected same sort we just applied programmatically
+                if (pref == state?.pref) return
                 persistPerFolder(sortModel, ctx, pref)
             } else {
                 applyPerFolderSort(sortModel, fields, ctx)
@@ -126,7 +127,6 @@ class SortCursorHooker : XposedInterface.Hooker {
             if (pref.position < 0) return
             applyPrefToDimensions(sortModel, fields, dimensions, pref)
             instanceState[sortModel] = AppliedState(key, pref)
-            if (DEBUG) log("SortCursor: applied per-folder, key=$key")
         }
 
         private fun persistPerFolder(
@@ -137,7 +137,6 @@ class SortCursorHooker : XposedInterface.Hooker {
             val key = ctx.toKey()
             FolderSortPreferenceStore.persist(key, pref)
             instanceState[sortModel] = AppliedState(key, pref)
-            if (DEBUG) log("SortCursor: persisted per-folder, key=$key")
         }
 
         private fun getCurrentSortPref(

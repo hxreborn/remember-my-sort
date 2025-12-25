@@ -19,31 +19,13 @@ data class FolderContext(
     val authority: String,
     val rootId: String,
     val documentId: String,
-    val isVirtual: Boolean,
 ) {
-    fun toKey(): String =
-        if (isVirtual) {
-            GLOBAL_KEY
-        } else {
-            val safeAuth = authority.ifEmpty { NULL_MARKER }
-            val safeRoot = rootId.ifEmpty { NULL_MARKER }
-            val safeDoc = documentId.ifEmpty { NULL_MARKER }
-            "$userId:$safeAuth:$safeRoot:$safeDoc"
-        }
+    // External storage roots have trailing colon: docId="primary:" vs rootId="primary"
+    val isRoot: Boolean get() = documentId == rootId || documentId == "$rootId:"
+
+    fun toKey(): String = "$userId:$authority:$rootId:$documentId"
 
     companion object {
-        const val NULL_MARKER = "<null>"
-        const val GLOBAL_KEY = "GLOBAL"
-
-        fun virtual(): FolderContext =
-            FolderContext(
-                userId = 0,
-                authority = "",
-                rootId = NULL_MARKER,
-                documentId = NULL_MARKER,
-                isVirtual = true,
-            )
-
         fun extractUserId(userIdObj: Any?): Int =
             userIdObj?.let {
                 runCatching {

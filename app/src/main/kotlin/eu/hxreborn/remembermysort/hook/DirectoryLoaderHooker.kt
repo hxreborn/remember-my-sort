@@ -1,9 +1,10 @@
 package eu.hxreborn.remembermysort.hook
 
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
+import eu.hxreborn.remembermysort.model.BasicRootFields
+import eu.hxreborn.remembermysort.model.DocFields
 import eu.hxreborn.remembermysort.prefs.PrefsManager
 import eu.hxreborn.remembermysort.util.accessibleField
-import eu.hxreborn.remembermysort.util.getStringOrMarker
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedInterface.AfterHookCallback
 import io.github.libxposed.api.XposedInterface.BeforeHookCallback
@@ -12,14 +13,12 @@ import io.github.libxposed.api.annotations.BeforeInvocation
 import io.github.libxposed.api.annotations.XposedHooker
 import java.lang.reflect.Field
 
-private const val DERIVED_TYPE_RECENTS = 1
-
 @XposedHooker
 class DirectoryLoaderHooker : XposedInterface.Hooker {
     companion object {
         private var loaderFields: DirLoaderFields? = null
-        private var docInfoFields: DirDocFields? = null
-        private var rootInfoFields: DirRootFields? = null
+        private var docFields: DocFields? = null
+        private var rootFields: BasicRootFields? = null
 
         @JvmStatic
         @BeforeInvocation
@@ -29,12 +28,13 @@ class DirectoryLoaderHooker : XposedInterface.Hooker {
             val loader = callback.thisObject ?: return
 
             runCatching {
-                val ctx = extractContext(loader)
+                val ctx = extractContext(loader) ?: return
                 FolderContextHolder.set(ctx)
-                log("DirectoryLoader: context set, key=${ctx.toKey()}")
+                log(
+                    "DirectoryLoader: docId=${ctx.documentId}, rootId=${ctx.rootId}, isRoot=${ctx.isRoot}",
+                )
             }.onFailure { e ->
                 log("DirectoryLoader: failed to extract context", e)
-                FolderContextHolder.set(FolderContext.virtual())
             }
         }
 
@@ -44,31 +44,14 @@ class DirectoryLoaderHooker : XposedInterface.Hooker {
             FolderContextHolder.clear()
         }
 
-        private fun extractContext(loader: Any): FolderContext {
+        private fun extractContext(loader: Any): FolderContext? {
             val fields = getLoaderFields(loader.javaClass)
-            val doc = fields.mDoc.get(loader) ?: return FolderContext.virtual()
+            val doc = fields.mDoc.get(loader) ?: return null
             val root = fields.mRoot.get(loader)
-
-            val docFields = getDocInfoFields(doc.javaClass)
-            val rootId =
-                root?.let { getRootInfoFields(it.javaClass).rootId.getStringOrMarker(it) }
-                    ?: FolderContext.NULL_MARKER
-
-            return FolderContext(
-                userId = FolderContext.extractUserId(docFields.userId.get(doc)),
-                authority = docFields.authority.getStringOrMarker(doc),
-                rootId = rootId,
-                documentId = docFields.documentId.getStringOrMarker(doc),
-                isVirtual = isVirtualRoot(root),
-            )
+            val dFields = getDocFields(doc.javaClass)
+            val rFields = root?.let { getRootFields(it.javaClass) }
+            return ContextExtractor.fromDoc(doc, root, dFields, rFields)
         }
-
-        private fun isVirtualRoot(root: Any?): Boolean =
-            root?.let {
-                getRootInfoFields(it.javaClass).derivedType.getInt(it) ==
-                    DERIVED_TYPE_RECENTS
-            }
-                ?: true
 
         private fun getLoaderFields(clazz: Class<*>): DirLoaderFields =
             loaderFields?.takeIf { it.clazz == clazz }
@@ -78,19 +61,19 @@ class DirectoryLoaderHooker : XposedInterface.Hooker {
                     clazz.accessibleField("mRoot"),
                 ).also { loaderFields = it }
 
-        private fun getDocInfoFields(clazz: Class<*>): DirDocFields =
-            docInfoFields?.takeIf { it.clazz == clazz }
-                ?: DirDocFields(
+        private fun getDocFields(clazz: Class<*>): DocFields =
+            docFields?.takeIf { it.clazz == clazz }
+                ?: DocFields(
                     clazz,
                     clazz.getField("userId"),
                     clazz.getField("authority"),
                     clazz.getField("documentId"),
-                ).also { docInfoFields = it }
+                ).also { docFields = it }
 
-        private fun getRootInfoFields(clazz: Class<*>): DirRootFields =
-            rootInfoFields?.takeIf { it.clazz == clazz }
-                ?: DirRootFields(clazz, clazz.getField("rootId"), clazz.getField("derivedType"))
-                    .also { rootInfoFields = it }
+        private fun getRootFields(clazz: Class<*>): BasicRootFields =
+            rootFields?.takeIf { it.clazz == clazz }
+                ?: BasicRootFields(clazz, clazz.getField("rootId"))
+                    .also { rootFields = it }
     }
 }
 
@@ -98,17 +81,4 @@ private data class DirLoaderFields(
     val clazz: Class<*>,
     val mDoc: Field,
     val mRoot: Field,
-)
-
-private data class DirDocFields(
-    val clazz: Class<*>,
-    val userId: Field,
-    val authority: Field,
-    val documentId: Field,
-)
-
-private data class DirRootFields(
-    val clazz: Class<*>,
-    val rootId: Field,
-    val derivedType: Field,
 )

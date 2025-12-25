@@ -69,8 +69,8 @@ class RememberMySortModule(
             hook(method, hooker)
             log("Hooked $className")
         }.onFailure { e ->
-            // Class may not exist on some OEM/Play builds - fallback to global prefs
-            log("$className not found, skipping (OEM variant?)", e)
+            // Some OEM or Play Store builds lack this class; module still works via SortCursorHooker alone
+            log("$className not found, skipping", e)
         }
     }
 
@@ -81,9 +81,6 @@ class RememberMySortModule(
         private const val DIRECTORY_LOADER_CLASS = "com.android.documentsui.DirectoryLoader"
         private const val FOLDER_LOADER_CLASS = "com.android.documentsui.loaders.FolderLoader"
         private const val LOAD_IN_BACKGROUND_METHOD = "loadInBackground"
-
-        // Hot-path logs gated behind this flag
-        const val DEBUG = false
 
         fun log(
             msg: String,
