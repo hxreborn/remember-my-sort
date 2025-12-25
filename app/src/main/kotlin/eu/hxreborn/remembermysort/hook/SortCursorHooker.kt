@@ -2,16 +2,20 @@ package eu.hxreborn.remembermysort.hook
 
 import android.util.SparseArray
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
-import eu.hxreborn.remembermysort.data.SortPreferenceStore
+import eu.hxreborn.remembermysort.data.FolderSortPreferenceStore
+import eu.hxreborn.remembermysort.data.GlobalSortPreferenceStore
 import eu.hxreborn.remembermysort.model.ReflectedDimension
 import eu.hxreborn.remembermysort.model.ReflectedSortModel
 import eu.hxreborn.remembermysort.model.Sort
 import eu.hxreborn.remembermysort.model.SortPreference
-import eu.hxreborn.remembermysort.module
+import eu.hxreborn.remembermysort.prefs.PrefsManager
+import eu.hxreborn.remembermysort.util.accessibleField
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedInterface.BeforeHookCallback
 import io.github.libxposed.api.annotations.BeforeInvocation
 import io.github.libxposed.api.annotations.XposedHooker
+import java.util.Collections
+import java.util.WeakHashMap
 
 @XposedHooker
 class SortCursorHooker : XposedInterface.Hooker {
@@ -19,54 +23,154 @@ class SortCursorHooker : XposedInterface.Hooker {
         private var sortModelFields: ReflectedSortModel? = null
         private var dimensionFields: ReflectedDimension? = null
 
+        // WeakHashMap keyed by SortModel instance to avoid cross-window collisions and auto-clear with UI lifecycle
+        private val instanceState = Collections.synchronizedMap(WeakHashMap<Any, AppliedState>())
+
+        private data class AppliedState(
+            val key: String,
+            val pref: SortPreference,
+        )
+
         @JvmStatic
         @BeforeInvocation
         fun beforeInvocation(callback: BeforeHookCallback) {
             val sortModel = callback.thisObject ?: return
 
-            try {
-                val fields = getSortModelFields(sortModel.javaClass)
-                val isUserSpecified = fields.isUserSpecified.getBoolean(sortModel)
+            val fields =
+                runCatching { getSortModelFields(sortModel.javaClass) }
+                    .onFailure { e -> log("SortCursor: reflection failed", e) }
+                    .getOrNull() ?: return
 
-                if (isUserSpecified) {
-                    persistUserChoice(sortModel, fields)
-                } else {
-                    applyPersistedSort(sortModel, fields)
-                }
+            val isUserSpecified = fields.isUserSpecified.getBoolean(sortModel)
+            val ctx = FolderContextHolder.get()
+
+            if (!shouldUsePerFolder(ctx)) {
+                handleGlobalPath(sortModel, fields, isUserSpecified)
+                return
+            }
+
+            try {
+                handlePerFolderPath(sortModel, fields, isUserSpecified, ctx!!)
             } catch (e: Exception) {
-                log("Hook error", e)
+                log("Per-folder failed, falling back to global", e)
+                handleGlobalPath(sortModel, fields, isUserSpecified)
             }
         }
 
-        private fun persistUserChoice(
+        private const val GLOBAL_STATE_KEY = "::GLOBAL::"
+
+        private fun shouldUsePerFolder(ctx: FolderContext?): Boolean =
+            PrefsManager.isPerFolderEnabled() && ctx != null && !ctx.isRoot
+
+        private fun handleGlobalPath(
+            sortModel: Any,
+            fields: ReflectedSortModel,
+            isUserSpecified: Boolean,
+        ) {
+            val state = instanceState[sortModel]
+            val transitionedToGlobal = state?.key != null && state.key != GLOBAL_STATE_KEY
+
+            if (transitionedToGlobal || !isUserSpecified) {
+                applyGlobalSort(sortModel, fields)
+                return
+            }
+
+            val pref = getCurrentSortPref(sortModel, fields) ?: return
+            if (pref == state?.pref) return
+            GlobalSortPreferenceStore.persist(pref)
+            instanceState[sortModel] = AppliedState(GLOBAL_STATE_KEY, pref)
+        }
+
+        private fun applyGlobalSort(
             sortModel: Any,
             fields: ReflectedSortModel,
         ) {
             val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return
-            val currentDim = fields.sortedDimension.get(sortModel) ?: return
-            val dimFields = getDimensionFields(currentDim.javaClass)
+            val pref = GlobalSortPreferenceStore.load()
+            if (pref.position < 0) return
+            applyPrefToDimensions(sortModel, fields, dimensions, pref)
+            instanceState[sortModel] = AppliedState(GLOBAL_STATE_KEY, pref)
+        }
+
+        private fun handlePerFolderPath(
+            sortModel: Any,
+            fields: ReflectedSortModel,
+            isUserSpecified: Boolean,
+            ctx: FolderContext,
+        ) {
+            val currentKey = ctx.toKey()
+            val state = instanceState[sortModel]
+
+            if (currentKey != state?.key) {
+                applyPerFolderSort(sortModel, fields, ctx)
+                return
+            }
+
+            if (isUserSpecified) {
+                val pref = getCurrentSortPref(sortModel, fields) ?: return
+                // Skip if user selected same sort we just applied programmatically
+                if (pref == state?.pref) return
+                persistPerFolder(sortModel, ctx, pref)
+            } else {
+                applyPerFolderSort(sortModel, fields, ctx)
+            }
+        }
+
+        private fun applyPerFolderSort(
+            sortModel: Any,
+            fields: ReflectedSortModel,
+            ctx: FolderContext,
+        ) {
+            val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return
+            val key = ctx.toKey()
+            val pref = FolderSortPreferenceStore.load(key)
+            if (pref.position < 0) return
+            applyPrefToDimensions(sortModel, fields, dimensions, pref)
+            instanceState[sortModel] = AppliedState(key, pref)
+        }
+
+        private fun persistPerFolder(
+            sortModel: Any,
+            ctx: FolderContext,
+            pref: SortPreference,
+        ) {
+            val key = ctx.toKey()
+            FolderSortPreferenceStore.persist(key, pref)
+            instanceState[sortModel] = AppliedState(key, pref)
+        }
+
+        private fun getCurrentSortPref(
+            sortModel: Any,
+            fields: ReflectedSortModel,
+        ): SortPreference? {
+            val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return null
+            val currentDim = fields.sortedDimension.get(sortModel) ?: return null
+            val dimFields =
+                runCatching { getDimensionFields(currentDim.javaClass) }
+                    .getOrNull() ?: return null
 
             val dimId = dimFields.id.getInt(currentDim)
             val direction = dimFields.sortDirection.getInt(currentDim)
             val position =
                 (0 until dimensions.size())
                     .firstOrNull { dimensions.valueAt(it) === currentDim }
-                    ?: return
+                    ?: return null
 
-            SortPreferenceStore.persist(SortPreference(position, dimId, direction))
+            return SortPreference(position, dimId, direction)
         }
 
-        private fun applyPersistedSort(
+        private fun applyPrefToDimensions(
             sortModel: Any,
             fields: ReflectedSortModel,
+            dimensions: SparseArray<*>,
+            pref: SortPreference,
         ) {
-            val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return
-            val pref = SortPreferenceStore.load()
-            if (pref.position < 0) return
-
             val positionValid = pref.position in 0 until dimensions.size()
             val candidateDim = if (positionValid) dimensions.valueAt(pref.position) else null
-            val dimFields = candidateDim?.let { getDimensionFields(it.javaClass) }
+            val dimFields =
+                candidateDim?.let {
+                    runCatching { getDimensionFields(it.javaClass) }.getOrNull()
+                }
             val actualDimId = dimFields?.id?.getInt(candidateDim) ?: -1
             val dimIdMatches = actualDimId == pref.dimId
 
@@ -78,13 +182,18 @@ class SortCursorHooker : XposedInterface.Hooker {
 
                     else -> {
                         log(
-                            "Mismatch: pos=${pref.position} expected dimId=${pref.dimId}, got $actualDimId",
+                            "SortCursor: dimId mismatch, pos=${pref.position} " +
+                                "expected=${pref.dimId} got=$actualDimId",
                         )
+                        // Fallback if dimension ID changed like OS update default to Date which is usually most relevant
                         findDateDimension(dimensions)
                     }
                 } ?: return
 
-            val targetDimFields = getDimensionFields(targetDim.javaClass)
+            val targetDimFields =
+                runCatching { getDimensionFields(targetDim.javaClass) }
+                    .getOrNull() ?: return
+
             targetDimFields.sortDirection.setInt(targetDim, pref.direction)
             fields.sortedDimension.set(sortModel, targetDim)
         }
@@ -92,45 +201,27 @@ class SortCursorHooker : XposedInterface.Hooker {
         private fun findDateDimension(dimensions: SparseArray<*>): Any? =
             (0 until dimensions.size()).firstNotNullOfOrNull { i ->
                 dimensions.valueAt(i)?.takeIf { dim ->
-                    val fields = getDimensionFields(dim.javaClass)
-                    fields.defaultSortDirection.getInt(dim) == Sort.DIRECTION_DESC
+                    val dimFields =
+                        runCatching { getDimensionFields(dim.javaClass) }
+                            .getOrNull() ?: return@takeIf false
+                    dimFields.defaultSortDirection.getInt(dim) == Sort.DIRECTION_DESC
                 }
             }
 
         private fun getSortModelFields(clazz: Class<*>): ReflectedSortModel =
-            sortModelFields?.takeIf { it.clazz == clazz }
-                ?: ReflectedSortModel(
-                    clazz = clazz,
-                    isUserSpecified =
-                        clazz.getDeclaredField("mIsUserSpecified").apply {
-                            isAccessible = true
-                        },
-                    dimensions =
-                        clazz.getDeclaredField("mDimensions").apply {
-                            isAccessible = true
-                        },
-                    sortedDimension =
-                        clazz.getDeclaredField("mSortedDimension").apply {
-                            isAccessible = true
-                        },
-                ).also { sortModelFields = it }
+            sortModelFields?.takeIf { it.clazz == clazz } ?: ReflectedSortModel(
+                clazz = clazz,
+                isUserSpecified = clazz.accessibleField("mIsUserSpecified"),
+                dimensions = clazz.accessibleField("mDimensions"),
+                sortedDimension = clazz.accessibleField("mSortedDimension"),
+            ).also { sortModelFields = it }
 
         private fun getDimensionFields(clazz: Class<*>): ReflectedDimension =
-            dimensionFields?.takeIf { it.clazz == clazz }
-                ?: ReflectedDimension(
-                    clazz = clazz,
-                    id =
-                        clazz.getDeclaredField("mId").apply {
-                            isAccessible = true
-                        },
-                    sortDirection =
-                        clazz.getDeclaredField("mSortDirection").apply {
-                            isAccessible = true
-                        },
-                    defaultSortDirection =
-                        clazz.getDeclaredField("mDefaultSortDirection").apply {
-                            isAccessible = true
-                        },
-                ).also { dimensionFields = it }
+            dimensionFields?.takeIf { it.clazz == clazz } ?: ReflectedDimension(
+                clazz = clazz,
+                id = clazz.accessibleField("mId"),
+                sortDirection = clazz.accessibleField("mSortDirection"),
+                defaultSortDirection = clazz.accessibleField("mDefaultSortDirection"),
+            ).also { dimensionFields = it }
     }
 }
