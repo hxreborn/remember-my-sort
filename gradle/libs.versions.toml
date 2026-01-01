@@ -3,12 +3,9 @@ agp = "8.11.0"
 kotlin = "2.1.21"
 ktlint = "14.0.1"
 xposed = "100"
-core-ktx = "1.17.0"
 
 [libraries]
 libxposed-api = { group = "io.github.libxposed", name = "api", version.ref = "xposed" }
-libxposed-service = { group = "io.github.libxposed", name = "service", version = "100-1.0.0" }
-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
 
 [plugins]
 agp-app = { id = "com.android.application", version.ref = "agp" }

@@ -2,7 +2,6 @@ package eu.hxreborn.remembermysort.model
 
 import java.lang.reflect.Field
 
-// Shared doc info fields
 data class DocFields(
     val clazz: Class<*>,
     val userId: Field,
@@ -10,7 +9,6 @@ data class DocFields(
     val documentId: Field,
 )
 
-// Root fields interface
 interface RootFields {
     val clazz: Class<*>
     val rootId: Field

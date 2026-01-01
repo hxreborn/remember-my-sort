@@ -16,7 +16,11 @@ Users have [reported the issue since 2021](https://xdaforums.com/t/google-files-
 
 ## How it Works
 
-Hooks into DocumentsUI sort logic. Manual sort changes are persisted to storage and restored on subsequent picker launches. Defaults to date descending on first run.
+Hooks into `SortModel.sortCursor()` in DocumentsUI. Manual sort changes are persisted and restored on subsequent picker launches.
+
+## Sorting Behavior
+
+Like file explorers with a "remember only this folder" checkbox, but always checked. Your last sort also becomes the default for new folders.
 
 ## Requirements
 
@@ -48,7 +52,6 @@ Requires JDK 21 and Gradle 8.13.
 
 ## License
 
-![GNU badge](https://img.shields.io/badge/-GNU-555?style=flat&logo=gnu&logoColor=white)
-![GPLv3 badge](https://img.shields.io/badge/-GPLv3-c62828?style=flat)
+<a href="LICENSE"><img src=".github/assets/gplv3.svg" height="90" alt="GPLv3"></a>
 
 This project is licensed under the GNU General Public License v3.0 – see the [LICENSE](LICENSE) file for details.

@@ -2,13 +2,11 @@ package eu.hxreborn.remembermysort.hook
 
 import android.util.SparseArray
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
-import eu.hxreborn.remembermysort.data.FolderSortPreferenceStore
-import eu.hxreborn.remembermysort.data.GlobalSortPreferenceStore
+import eu.hxreborn.remembermysort.data.SortPreferenceStore
 import eu.hxreborn.remembermysort.model.ReflectedDimension
 import eu.hxreborn.remembermysort.model.ReflectedSortModel
 import eu.hxreborn.remembermysort.model.Sort
 import eu.hxreborn.remembermysort.model.SortPreference
-import eu.hxreborn.remembermysort.prefs.PrefsManager
 import eu.hxreborn.remembermysort.util.accessibleField
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedInterface.BeforeHookCallback
@@ -23,11 +21,11 @@ class SortCursorHooker : XposedInterface.Hooker {
         private var sortModelFields: ReflectedSortModel? = null
         private var dimensionFields: ReflectedDimension? = null
 
-        // WeakHashMap keyed by SortModel instance to avoid cross-window collisions and auto-clear with UI lifecycle
-        private val instanceState = Collections.synchronizedMap(WeakHashMap<Any, AppliedState>())
+        // prevent stale state when fragments are rebuilt
+        private val sortStates = Collections.synchronizedMap(WeakHashMap<Any, SortState>())
 
-        private data class AppliedState(
-            val key: String,
+        private data class SortState(
+            val folderKey: String?, // null = global mode
             val pref: SortPreference,
         )
 
@@ -42,101 +40,59 @@ class SortCursorHooker : XposedInterface.Hooker {
                     .getOrNull() ?: return
 
             val isUserSpecified = fields.isUserSpecified.getBoolean(sortModel)
-            val ctx = FolderContextHolder.get()
-
-            if (!shouldUsePerFolder(ctx)) {
-                handleGlobalPath(sortModel, fields, isUserSpecified)
-                return
-            }
-
-            try {
-                handlePerFolderPath(sortModel, fields, isUserSpecified, ctx!!)
-            } catch (e: Exception) {
-                log("Per-folder failed, falling back to global", e)
-                handleGlobalPath(sortModel, fields, isUserSpecified)
-            }
+            val folderKey = currentFolderKey(sortModel)
+            syncSortState(sortModel, fields, isUserSpecified, folderKey)
         }
 
-        private const val GLOBAL_STATE_KEY = "::GLOBAL::"
+        // falls back to cached key when loader context unavailable (eg: manual re-sort)
+        private fun currentFolderKey(sortModel: Any): String? {
+            val ctxKey = FolderContextHolder.get()?.toKey()
+            if (ctxKey != null) return ctxKey
+            val storedKey = sortStates[sortModel]?.folderKey
+            if (storedKey != null) log("SortCursor: ctx empty, fallback=$storedKey")
+            return storedKey
+        }
 
-        private fun shouldUsePerFolder(ctx: FolderContext?): Boolean =
-            PrefsManager.isPerFolderEnabled() && ctx != null && !ctx.isRoot
-
-        private fun handleGlobalPath(
+        private fun syncSortState(
             sortModel: Any,
             fields: ReflectedSortModel,
             isUserSpecified: Boolean,
+            folderKey: String?,
         ) {
-            val state = instanceState[sortModel]
-            val transitionedToGlobal = state?.key != null && state.key != GLOBAL_STATE_KEY
+            val state = sortStates[sortModel]
 
-            if (transitionedToGlobal || !isUserSpecified) {
-                applyGlobalSort(sortModel, fields)
+            // restore persisted pref on navigation or programmatic sort reset
+            if (folderKey != state?.folderKey || !isUserSpecified) {
+                val mode = folderKey ?: "global"
+                log("SortCursor: apply saved, folder=$mode user=$isUserSpecified")
+                applySavedSort(sortModel, fields, folderKey)
                 return
             }
 
+            // user manually changed sort in same folder
             val pref = getCurrentSortPref(sortModel, fields) ?: return
-            if (pref == state?.pref) return
-            GlobalSortPreferenceStore.persist(pref)
-            instanceState[sortModel] = AppliedState(GLOBAL_STATE_KEY, pref)
-        }
-
-        private fun applyGlobalSort(
-            sortModel: Any,
-            fields: ReflectedSortModel,
-        ) {
-            val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return
-            val pref = GlobalSortPreferenceStore.load()
-            if (pref.position < 0) return
-            applyPrefToDimensions(sortModel, fields, dimensions, pref)
-            instanceState[sortModel] = AppliedState(GLOBAL_STATE_KEY, pref)
-        }
-
-        private fun handlePerFolderPath(
-            sortModel: Any,
-            fields: ReflectedSortModel,
-            isUserSpecified: Boolean,
-            ctx: FolderContext,
-        ) {
-            val currentKey = ctx.toKey()
-            val state = instanceState[sortModel]
-
-            if (currentKey != state?.key) {
-                applyPerFolderSort(sortModel, fields, ctx)
-                return
-            }
-
-            if (isUserSpecified) {
-                val pref = getCurrentSortPref(sortModel, fields) ?: return
-                // Skip if user selected same sort we just applied programmatically
-                if (pref == state?.pref) return
-                persistPerFolder(sortModel, ctx, pref)
-            } else {
-                applyPerFolderSort(sortModel, fields, ctx)
+            if (pref != state?.pref) {
+                val mode = folderKey ?: "global"
+                log("SortCursor: persist folder=$mode pref=$pref")
+                persistSort(folderKey, pref)
+                sortStates[sortModel] = SortState(folderKey, pref)
             }
         }
 
-        private fun applyPerFolderSort(
+        private fun applySavedSort(
             sortModel: Any,
             fields: ReflectedSortModel,
-            ctx: FolderContext,
+            folderKey: String?,
         ) {
             val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return
-            val key = ctx.toKey()
-            val pref = FolderSortPreferenceStore.load(key)
+            val pref = SortPreferenceStore.load(folderKey)
             if (pref.position < 0) return
             applyPrefToDimensions(sortModel, fields, dimensions, pref)
-            instanceState[sortModel] = AppliedState(key, pref)
+            sortStates[sortModel] = SortState(folderKey, pref)
         }
 
-        private fun persistPerFolder(
-            sortModel: Any,
-            ctx: FolderContext,
-            pref: SortPreference,
-        ) {
-            val key = ctx.toKey()
-            FolderSortPreferenceStore.persist(key, pref)
-            instanceState[sortModel] = AppliedState(key, pref)
+        private fun persistSort(folderKey: String?, pref: SortPreference) {
+            SortPreferenceStore.persist(folderKey, pref)
         }
 
         private fun getCurrentSortPref(
@@ -182,10 +138,8 @@ class SortCursorHooker : XposedInterface.Hooker {
 
                     else -> {
                         log(
-                            "SortCursor: dimId mismatch, pos=${pref.position} " +
-                                "expected=${pref.dimId} got=$actualDimId",
+                            "SortCursor: dimId mismatch pos=${pref.position} exp=${pref.dimId} got=$actualDimId",
                         )
-                        // Fallback if dimension ID changed like OS update default to Date which is usually most relevant
                         findDateDimension(dimensions)
                     }
                 } ?: return

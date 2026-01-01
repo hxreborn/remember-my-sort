@@ -7,59 +7,41 @@ import org.json.JSONObject
 import java.io.File
 
 private const val PREF_FILENAME = "rms_folder_prefs"
-private const val OLD_GLOBAL_FILE = "rms_pref"
-private const val MIGRATED_MARKER = "rms_migrated"
 private const val MAX_ENTRIES = 256
 
-internal object FolderSortPreferenceStore {
+// fallback for folders without a saved preference, updated on every save
+private const val LAST_KEY = "__last__"
+
+internal object SortPreferenceStore {
     private val context by lazy { ContextHelper.applicationContext }
 
     private val cache = LinkedHashMap<String, SortPreference>(MAX_ENTRIES, 0.75f)
     private val lock = Any()
 
     private val ensureInit: Unit by lazy {
-        migrateIfNeeded()
         loadFromDisk()
-        log("FolderSortPreferenceStore: initialized, ${cache.size} entries")
+        log("SortPreferenceStore: initialized, ${cache.size} entries")
     }
 
-    fun load(folderKey: String): SortPreference {
+    fun load(folderKey: String?): SortPreference {
         ensureInit
-        return synchronized(lock) { cache[folderKey] }
-            ?.also { log("FolderSort: loaded from per-folder, key=$folderKey") }
-            ?: GlobalSortPreferenceStore.load().also {
-                log("FolderSort: fallback to global for key=$folderKey")
-            }
+        val key = folderKey ?: LAST_KEY
+        return synchronized(lock) { cache[key] } ?: SortPreference.DEFAULT
     }
 
-    fun persist(
-        folderKey: String,
-        pref: SortPreference,
-    ): Boolean {
+    fun persist(folderKey: String?, pref: SortPreference): Boolean {
         ensureInit
+        val key = folderKey ?: LAST_KEY
         synchronized(lock) {
-            if (cache[folderKey] == pref) return false
-            cache[folderKey] = pref
+            if (cache[key] == pref) return false
+            cache[key] = pref
+            // per-folder saves also update fallback so new folders inherit last choice
+            if (folderKey != null) cache[LAST_KEY] = pref
             evictIfNeeded()
             writeToDiskLocked()
         }
-        log("FolderSort: persisted to per-folder, key=$folderKey, pref=$pref")
+        log("SortPreferenceStore: persisted key=$key pref=$pref")
         return true
-    }
-
-    private fun migrateIfNeeded() {
-        val markerFile =
-            File(context.filesDir, MIGRATED_MARKER).takeUnless { it.exists() } ?: return
-
-        File(context.filesDir, OLD_GLOBAL_FILE).takeIf { it.exists() }?.let {
-            GlobalSortPreferenceStore.load().takeIf { it != SortPreference.DEFAULT }?.let {
-                log(
-                    "FolderSort: migration complete, global pref preserved in GlobalSortPreferenceStore",
-                )
-            }
-        }
-
-        runCatching { markerFile.createNewFile() }
     }
 
     private fun loadFromDisk() {
@@ -76,20 +58,18 @@ internal object FolderSortPreferenceStore {
                                     direction = json.getInt("dir"),
                                 )
                         }
-                    }.onFailure { log("FolderSort: failed to parse line: $line") }
+                    }.onFailure { log("SortPreferenceStore: failed to parse line: $line") }
                 }
-                log("FolderSort: loaded ${cache.size} entries from disk")
-            }?.onFailure { e -> log("FolderSort: failed to load from disk", e) }
+                log("SortPreferenceStore: loaded ${cache.size} entries from disk")
+            }?.onFailure { e -> log("SortPreferenceStore: failed to load from disk", e) }
     }
 
-    // Caller must hold lock
     private fun writeToDiskLocked() {
         runCatching {
             val tempFile = File(context.filesDir, "$PREF_FILENAME.tmp")
             val targetFile = File(context.filesDir, PREF_FILENAME)
 
             tempFile.bufferedWriter().use { writer ->
-                // I/O stays under the lock because the capped map is small and avoids snapshot copies
                 cache.forEach { (key, pref) ->
                     val json =
                         JSONObject().apply {
@@ -104,20 +84,19 @@ internal object FolderSortPreferenceStore {
             }
 
             if (!tempFile.renameTo(targetFile)) {
-                // Atomic rename failed - fallback to copy+delete
                 tempFile.copyTo(targetFile, overwrite = true)
                 tempFile.delete()
             }
 
-            log("FolderSort: wrote ${cache.size} entries to disk")
+            log("SortPreferenceStore: wrote ${cache.size} entries to disk")
         }.onFailure { e ->
-            log("FolderSort: failed to write to disk", e)
+            log("SortPreferenceStore: failed to write to disk", e)
         }
     }
 
     private fun evictIfNeeded() =
         (cache.size - MAX_ENTRIES).takeIf { it > 0 }?.let { excess ->
             cache.keys.take(excess).forEach { cache.remove(it) }
-            log("FolderSort: evicted $excess oldest entries")
+            log("SortPreferenceStore: evicted $excess oldest entries")
         }
 }
