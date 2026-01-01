@@ -1,4 +1,9 @@
 <resources>
     <string name="app_name">Remember My Sort</string>
-    <string name="app_desc">Make Android’s system file picker remember your sort preferences.</string>
+    <string name="app_desc">Make Android\'s system file picker remember your sort preferences.</string>
+    <string name="per_folder_title">Per-folder sort preferences</string>
+    <string name="per_folder_desc">Each folder remembers its own sort setting</string>
+    <string name="experimental_warning">Experimental feature</string>
+    <string name="feedback_title">Having trouble?</string>
+    <string name="feedback_desc">Report issues or give feedback</string>
 </resources>
