@@ -1,1 +1,1 @@
-LSPosed module that persists Android file picker sort order
+Xposed module that persists Android file picker sort order
