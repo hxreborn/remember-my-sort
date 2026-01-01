@@ -7,6 +7,7 @@ An LSPosed module that forces the Android file picker to remember your sorting p
 ![Android](https://img.shields.io/badge/API-30%2B-3DDC84?logo=android&logoColor=white)
 
 <p>
+  <a href="https://f-droid.org/en/packages/eu.hxreborn.remembermysort/"><img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" height="80" alt="Get it on F-Droid" /></a>
   <a href="https://apt.izzysoft.de/packages/eu.hxreborn.remembermysort"><img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" height="80" alt="Get it on IzzyOnDroid" /></a>
   <a href="../../releases"><img src=".github/assets/badge_github.png" height="82" alt="Get it on GitHub" /></a>
 </p>
@@ -19,7 +20,7 @@ Users have [reported the issue since 2021](https://xdaforums.com/t/google-files-
 
 ## How it Works
 
-Hooks into DocumentsUI sort logic. Manual sort changes are persisted to storage and restored on subsequent picker launches. Defaults to date descending on first run.
+Hooks into DocumentsUI sort logic. Manual sort changes are persisted to storage and restored on subsequent picker launches.
 
 ## Requirements
 
@@ -51,6 +52,6 @@ Requires JDK 21 and Gradle 8.13.
 
 ## License
 
-![License](https://img.shields.io/badge/License-GPLv3-c62828?style=flat&logo=gnu&logoColor=white)
+<a href="LICENSE"><img src=".github/assets/gplv3.svg" height="90" alt="GPLv3"></a>
 
 This project is licensed under the GNU General Public License v3.0 – see the [LICENSE](LICENSE) file for details.
