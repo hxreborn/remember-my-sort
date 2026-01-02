@@ -69,7 +69,7 @@ class SortCursorHooker : XposedInterface.Hooker {
 
                 // Update instance state
                 instanceState[sortModel] = AppliedState(perFolderTargetKey, pref)
-                log("SortCursor: saved per-folder sort for $displayName")
+                log("SortCursor: saved per-folder sort for $displayName (pos=${pref.position}, dir=${pref.direction})")
                 return
             }
 
@@ -93,7 +93,7 @@ class SortCursorHooker : XposedInterface.Hooker {
 
                 val message = if (hadOverride) "Global sort saved (folder override cleared)" else "Global sort saved"
                 ToastHelper.show(message)
-                log("SortCursor: saved global sort")
+                log("SortCursor: saved global sort (pos=${pref.position}, dir=${pref.direction})")
                 return
             }
 
@@ -130,6 +130,7 @@ class SortCursorHooker : XposedInterface.Hooker {
 
             dimFields.sortDirection.setInt(targetDim, pref.direction)
             fields.sortedDimension.set(sortModel, targetDim)
+            log("SortCursor: applied sort (pos=${pref.position}, dir=${pref.direction})")
         }
 
         private fun getSortModelFields(clazz: Class<*>): ReflectedSortModel =
