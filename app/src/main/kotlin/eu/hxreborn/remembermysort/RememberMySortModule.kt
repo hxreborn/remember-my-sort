@@ -4,6 +4,7 @@ import android.database.Cursor
 import eu.hxreborn.remembermysort.hook.DirectoryLoaderHooker
 import eu.hxreborn.remembermysort.hook.FolderLoaderHooker
 import eu.hxreborn.remembermysort.hook.LongPressHooker
+import eu.hxreborn.remembermysort.hook.RecentsLoaderHooker
 import eu.hxreborn.remembermysort.hook.SortCursorHooker
 import eu.hxreborn.remembermysort.hook.SortDialogDismissHooker
 import io.github.libxposed.api.XposedInterface
@@ -73,6 +74,7 @@ class RememberMySortModule(
             listOf(
                 DIRECTORY_LOADER_CLASS to DirectoryLoaderHooker::class.java,
                 FOLDER_LOADER_CLASS to FolderLoaderHooker::class.java,
+                RECENTS_LOADER_CLASS to RecentsLoaderHooker::class.java,
             )
 
         for ((className, hooker) in loaders) {
@@ -101,6 +103,7 @@ class RememberMySortModule(
         private const val SORT_CURSOR_METHOD = "sortCursor"
         private const val DIRECTORY_LOADER_CLASS = "com.android.documentsui.DirectoryLoader"
         private const val FOLDER_LOADER_CLASS = "com.android.documentsui.loaders.FolderLoader"
+        private const val RECENTS_LOADER_CLASS = "com.android.documentsui.RecentsLoader"
         private const val LOAD_IN_BACKGROUND_METHOD = "loadInBackground"
         private const val SORT_LIST_FRAGMENT_CLASS =
             "com.android.documentsui.sorting.SortListFragment"

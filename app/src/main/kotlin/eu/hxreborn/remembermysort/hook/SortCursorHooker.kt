@@ -45,9 +45,7 @@ class SortCursorHooker : XposedInterface.Hooker {
             val isUserSpecified = fields.isUserSpecified.getBoolean(sortModel)
 
             // Get current folder key from context (set by loader hooks)
-            // Fall back to cached key when loader context already cleared (e.g., user re-sorts)
             val folderKey = FolderContextHolder.get()?.toKey()
-                ?: instanceState[sortModel]?.key?.takeUnless { it == GLOBAL_STATE_KEY }
 
             // Check if this is a per-folder save (from long-press in SortListFragment)
             val isPerFolderSave = LongPressHooker.nextSortIsPerFolder

@@ -19,6 +19,10 @@ object FolderContextHolder {
     fun get(): FolderContext? = threadLocal.get() ?: lastLoadedContext
 
     fun clear() = threadLocal.remove()
+
+    fun clearLast() {
+        lastLoadedContext = null
+    }
 }
 
 data class FolderContext(

@@ -126,3 +126,16 @@ class FolderLoaderHooker : XposedInterface.Hooker {
 
 private data class DirLoaderFields(val clazz: Class<*>, val mDoc: Field, val mRoot: Field)
 private data class FolderLoaderFields(val clazz: Class<*>, val mListedDir: Field, val mRoot: Field)
+
+// Hooks RecentsLoader.loadInBackground to clear stale folder context
+// Recent view doesn't have a folder, so we clear lastLoadedContext to prevent wrong per-folder saves
+@XposedHooker
+class RecentsLoaderHooker : XposedInterface.Hooker {
+    companion object {
+        @JvmStatic
+        @BeforeInvocation
+        fun beforeInvocation(@Suppress("UNUSED_PARAMETER") callback: BeforeHookCallback) {
+            FolderContextHolder.clearLast()
+        }
+    }
+}
