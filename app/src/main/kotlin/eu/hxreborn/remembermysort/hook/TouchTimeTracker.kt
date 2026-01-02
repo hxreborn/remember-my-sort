@@ -17,6 +17,7 @@ import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
 
 // Tracks touch down time via Window.Callback wrapper + auto-release on long-press
+// TODO: Simplify, add cohesive nomenclature 
 @XposedHooker
 class TouchTimeTracker : XposedInterface.Hooker {
     companion object {

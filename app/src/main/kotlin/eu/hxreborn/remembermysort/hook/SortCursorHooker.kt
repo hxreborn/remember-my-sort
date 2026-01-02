@@ -69,6 +69,8 @@ class SortCursorHooker : XposedInterface.Hooker {
                         .substringAfterLast(':')
                         .substringAfterLast('/')
                         .ifEmpty { "folder" }
+                // TODO: Improve readable names 
+                // TODO: Make it more robust as well 
                 ToastHelper.show("Sort saved for $displayName")
 
                 // Update instance state
@@ -95,6 +97,7 @@ class SortCursorHooker : XposedInterface.Hooker {
                 // Clear flag to ensure next folder load applies saved sort
                 fields.isUserSpecified.setBoolean(sortModel, false)
 
+                // TODO: Avoid showing 2 toasts, combine if hadOverride == true 
                 if (hadOverride) {
                     ToastHelper.show("Folder override cleared")
                 }
@@ -149,7 +152,7 @@ class SortCursorHooker : XposedInterface.Hooker {
                 candidateDim?.let {
                     runCatching { getDimensionFields(it.javaClass) }.getOrNull()
                 }
-            val actualDimId = dimFields?.id?.getInt(candidateDim) ?: -1
+            val actualDimId = dimFields?.id?.getInt(candidateDim) ?: -1 // TODO: Remove this sentinel if possible 
             val dimIdMatches = actualDimId == pref.dimId
 
             val targetDim =

@@ -25,6 +25,7 @@ class RememberMySortModule(
     override fun onPackageLoaded(param: PackageLoadedParam) {
         if (!param.isFirstPackage) return
 
+        // TODO: Improve this flow, global short must never fail 
         hookSortCursor(param.classLoader)
         hookSortByUser(param.classLoader)
         hookSortListFragmentOnStart(param.classLoader)
@@ -62,14 +63,14 @@ class RememberMySortModule(
             log("Failed to hook SortModel.sortByUser", e)
         }
     }
-    // set up touch tracking when dialog is visible
+    // set up touch tracking when "sort by" dialog is visible
     private fun hookSortListFragmentOnStart(classLoader: ClassLoader) {
         val sortFragmentClasses =
             listOf(
                 SORT_LIST_FRAGMENT_CLASS,
                 SORT_LIST_FRAGMENT_CLASS_GOOGLE,
             )
-
+    // TODO: use for-each
         for (className in sortFragmentClasses) {
             runCatching {
                 val clazz = classLoader.loadClass(className)

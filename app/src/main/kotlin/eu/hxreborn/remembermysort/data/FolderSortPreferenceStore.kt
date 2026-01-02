@@ -18,6 +18,7 @@ internal object FolderSortPreferenceStore {
     private val lock = Any()
 
     private val ensureInit: Unit by lazy {
+        // TODO: Improve, not necessary 
         migrateIfNeeded()
         loadFromDisk()
         log("FolderSortPreferenceStore: initialized, ${cache.size} entries")
