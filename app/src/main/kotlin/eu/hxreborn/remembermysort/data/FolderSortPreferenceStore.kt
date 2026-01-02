@@ -32,6 +32,23 @@ internal object FolderSortPreferenceStore {
             }
     }
 
+    fun loadIfExists(folderKey: String): SortPreference? {
+        ensureInit
+        return synchronized(lock) { cache[folderKey] }
+            ?.also { log("FolderSort: found override for key=$folderKey") }
+    }
+
+    fun delete(folderKey: String): Boolean {
+        ensureInit
+        val removed = synchronized(lock) {
+            cache.remove(folderKey)?.also { writeToDiskLocked() }
+        }
+        if (removed != null) {
+            log("FolderSort: deleted per-folder pref for key=$folderKey")
+        }
+        return removed != null
+    }
+
     fun persist(
         folderKey: String,
         pref: SortPreference,

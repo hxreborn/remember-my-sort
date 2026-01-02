@@ -1,16 +1,27 @@
 package eu.hxreborn.remembermysort.hook
 
 object FolderContextHolder {
-    private val current = ThreadLocal<FolderContext?>()
+    // ThreadLocal for loader thread used during sortCursor
+    private val threadLocal = ThreadLocal<FolderContext?>()
+
+    // Last loaded folder context (persists across threads)
+    @Volatile
+    private var lastLoadedContext: FolderContext? = null
 
     fun set(ctx: FolderContext?) {
-        current.set(ctx)
+        threadLocal.set(ctx)
+        // Also save as last loaded for UI thread access
+        if (ctx != null) {
+            lastLoadedContext = ctx
+        }
     }
 
-    fun get(): FolderContext? = current.get()
+    // Get from current thread first, fall back to last loaded
+    fun get(): FolderContext? = threadLocal.get() ?: lastLoadedContext
 
     fun clear() {
-        current.remove()
+        threadLocal.remove()
+        // lastLoadedContext doesnt need clearing
     }
 }
 
@@ -20,9 +31,6 @@ data class FolderContext(
     val rootId: String,
     val documentId: String,
 ) {
-    // External storage roots have trailing colon: docId="primary:" vs rootId="primary"
-    val isRoot: Boolean get() = documentId == rootId || documentId == "$rootId:"
-
     fun toKey(): String = "$userId:$authority:$rootId:$documentId"
 
     companion object {

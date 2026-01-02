@@ -6,4 +6,8 @@
     <string name="experimental_warning">Experimental feature</string>
     <string name="feedback_title">Having trouble?</string>
     <string name="feedback_desc">Report issues or give feedback</string>
+
+    <string name="toast_global_sort_saved">Global sort saved</string>
+    <string name="toast_folder_override_cleared">Folder override cleared</string>
+    <string name="toast_folder_sort_saved">Sort saved for %s</string>
 </resources>

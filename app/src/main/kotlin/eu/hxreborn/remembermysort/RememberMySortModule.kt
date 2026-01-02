@@ -3,8 +3,9 @@ package eu.hxreborn.remembermysort
 import android.database.Cursor
 import eu.hxreborn.remembermysort.hook.DirectoryLoaderHooker
 import eu.hxreborn.remembermysort.hook.FolderLoaderHooker
+import eu.hxreborn.remembermysort.hook.SortByUserHooker
 import eu.hxreborn.remembermysort.hook.SortCursorHooker
-import eu.hxreborn.remembermysort.prefs.PrefsManager
+import eu.hxreborn.remembermysort.hook.TouchTimeTracker
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
@@ -24,9 +25,9 @@ class RememberMySortModule(
     override fun onPackageLoaded(param: PackageLoadedParam) {
         if (!param.isFirstPackage) return
 
-        PrefsManager.init(this)
-
         hookSortCursor(param.classLoader)
+        hookSortByUser(param.classLoader)
+        hookSortListFragmentOnStart(param.classLoader)
         hookLoaders(param.classLoader)
 
         log("Module initialized in ${param.packageName}")
@@ -43,6 +44,41 @@ class RememberMySortModule(
             log("Hooked $SORT_CURSOR_METHOD")
         }.onFailure { e ->
             log("Failed to hook SortModel.sortCursor", e)
+        }
+    }
+
+    private fun hookSortByUser(classLoader: ClassLoader) {
+        runCatching {
+            val sortModel = classLoader.loadClass(SORT_MODEL_CLASS)
+            val method =
+                sortModel.getDeclaredMethod(
+                    SORT_BY_USER_METHOD,
+                    Int::class.javaPrimitiveType,
+                    Int::class.javaPrimitiveType,
+                )
+            hook(method, SortByUserHooker::class.java)
+            log("Hooked $SORT_BY_USER_METHOD")
+        }.onFailure { e ->
+            log("Failed to hook SortModel.sortByUser", e)
+        }
+    }
+    // set up touch tracking when dialog is visible
+    private fun hookSortListFragmentOnStart(classLoader: ClassLoader) {
+        val sortFragmentClasses =
+            listOf(
+                SORT_LIST_FRAGMENT_CLASS,
+                SORT_LIST_FRAGMENT_CLASS_GOOGLE,
+            )
+
+        for (className in sortFragmentClasses) {
+            runCatching {
+                val clazz = classLoader.loadClass(className)
+                val onStart = clazz.getMethod("onStart")
+                hook(onStart, TouchTimeTracker::class.java)
+                log("Hooked $className.onStart for touch tracking")
+            }.onFailure { e ->
+                log("$className.onStart not found: ${e.message}")
+            }
         }
     }
 
@@ -69,7 +105,6 @@ class RememberMySortModule(
             hook(method, hooker)
             log("Hooked $className")
         }.onFailure { e ->
-            // Some OEM or Play Store builds lack this class; module still works via SortCursorHooker alone
             log("$className not found, skipping", e)
         }
     }
@@ -78,9 +113,14 @@ class RememberMySortModule(
         private const val SORT_MODEL_CLASS = "com.android.documentsui.sorting.SortModel"
         private const val LOOKUP_CLASS = "com.android.documentsui.base.Lookup"
         private const val SORT_CURSOR_METHOD = "sortCursor"
+        private const val SORT_BY_USER_METHOD = "sortByUser"
         private const val DIRECTORY_LOADER_CLASS = "com.android.documentsui.DirectoryLoader"
         private const val FOLDER_LOADER_CLASS = "com.android.documentsui.loaders.FolderLoader"
         private const val LOAD_IN_BACKGROUND_METHOD = "loadInBackground"
+        private const val SORT_LIST_FRAGMENT_CLASS =
+            "com.android.documentsui.sorting.SortListFragment"
+        private const val SORT_LIST_FRAGMENT_CLASS_GOOGLE =
+            "com.google.android.documentsui.sorting.SortListFragment"
 
         fun log(
             msg: String,

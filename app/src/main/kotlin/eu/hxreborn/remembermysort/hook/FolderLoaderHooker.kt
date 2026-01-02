@@ -3,7 +3,6 @@ package eu.hxreborn.remembermysort.hook
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import eu.hxreborn.remembermysort.model.DocFields
 import eu.hxreborn.remembermysort.model.ExtendedRootFields
-import eu.hxreborn.remembermysort.prefs.PrefsManager
 import eu.hxreborn.remembermysort.util.accessibleField
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedInterface.AfterHookCallback
@@ -23,15 +22,11 @@ class FolderLoaderHooker : XposedInterface.Hooker {
         @JvmStatic
         @BeforeInvocation
         fun beforeInvocation(callback: BeforeHookCallback) {
-            if (!PrefsManager.isPerFolderEnabled()) return
-
             val loader = callback.thisObject ?: return
             runCatching {
                 val ctx = extractContext(loader) ?: return
                 FolderContextHolder.set(ctx)
-                log(
-                    "FolderLoader: docId=${ctx.documentId}, rootId=${ctx.rootId}, isRoot=${ctx.isRoot}",
-                )
+                log("FolderLoader: docId=${ctx.documentId}, rootId=${ctx.rootId}")
             }.onFailure { e ->
                 log("FolderLoader: failed to extract context", e)
             }

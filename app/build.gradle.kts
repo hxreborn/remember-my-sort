@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.agp.app)
     alias(libs.plugins.kotlin)
-    alias(libs.plugins.compose.compiler)
     alias(libs.plugins.ktlint)
 }
 
@@ -64,7 +63,6 @@ android {
 
     buildFeatures {
         buildConfig = true
-        compose = true
     }
 
     compileOptions {
@@ -97,13 +95,5 @@ ktlint {
 
 dependencies {
     compileOnly(libs.libxposed.api)
-    implementation(libs.libxposed.service)
     implementation(libs.core.ktx)
-
-    implementation(platform(libs.compose.bom))
-    implementation(libs.compose.material3)
-    implementation(libs.compose.ui)
-    implementation(libs.compose.ui.tooling.preview)
-    implementation(libs.activity.compose)
-    debugImplementation(libs.compose.ui.tooling)
 }
