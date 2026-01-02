@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <queries>
+        <package android:name="com.google.android.documentsui" />
+        <package android:name="com.android.documentsui" />
+    </queries>
+
     <application
         android:name=".RememberMySortApp"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
-        android:description="@string/app_desc">
+        android:description="@string/app_desc"
+        android:theme="@style/Theme.RememberMySort">
 
         <activity
             android:name=".ui.MainActivity"
