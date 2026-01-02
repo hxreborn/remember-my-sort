@@ -92,8 +92,8 @@ class RememberMySortModule(
             val method = loaderClass.getDeclaredMethod(LOAD_IN_BACKGROUND_METHOD)
             hook(method, hooker)
             log("Hooked $className")
-        }.onFailure { e ->
-            log("$className not found, skipping", e)
+        }.onFailure { _ ->
+            log("$className not found, skipping")
         }
     }
 
