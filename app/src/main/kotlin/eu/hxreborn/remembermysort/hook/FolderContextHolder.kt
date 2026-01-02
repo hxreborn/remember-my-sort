@@ -1,28 +1,24 @@
 package eu.hxreborn.remembermysort.hook
 
+import eu.hxreborn.remembermysort.model.DocFields
+import eu.hxreborn.remembermysort.model.ExtendedRootFields
+import eu.hxreborn.remembermysort.model.RootFields
+import eu.hxreborn.remembermysort.util.getStringOrEmpty
+
 object FolderContextHolder {
-    // ThreadLocal for loader thread used during sortCursor
     private val threadLocal = ThreadLocal<FolderContext?>()
 
-    // Last loaded folder context (persists across threads)
     @Volatile
     private var lastLoadedContext: FolderContext? = null
 
     fun set(ctx: FolderContext?) {
         threadLocal.set(ctx)
-        // Also save as last loaded for UI thread access
-        if (ctx != null) {
-            lastLoadedContext = ctx
-        }
+        if (ctx != null) lastLoadedContext = ctx
     }
 
-    // Get from current thread first, fall back to last loaded
     fun get(): FolderContext? = threadLocal.get() ?: lastLoadedContext
 
-    fun clear() {
-        threadLocal.remove()
-        // lastLoadedContext doesnt need clearing
-    }
+    fun clear() = threadLocal.remove()
 }
 
 data class FolderContext(
@@ -48,5 +44,23 @@ data class FolderContext(
                     it.javaClass.getMethod("getIdentifier").invoke(it) as Int
                 }.getOrDefault(0)
             } ?: 0
+
+        fun fromDoc(doc: Any, root: Any?, docFields: DocFields, rootFields: RootFields?) =
+            FolderContext(
+                userId = extractUserId(docFields.userId.get(doc)),
+                authority = docFields.authority.getStringOrEmpty(doc),
+                rootId = root?.let { rootFields?.rootId?.getStringOrEmpty(it) } ?: "",
+                documentId = docFields.documentId.getStringOrEmpty(doc),
+            )
+
+        fun fromRoot(root: Any, fields: ExtendedRootFields): FolderContext? =
+            runCatching {
+                FolderContext(
+                    userId = extractUserId(fields.userId?.get(root)),
+                    authority = fields.authority?.getStringOrEmpty(root) ?: "",
+                    rootId = fields.rootId.getStringOrEmpty(root),
+                    documentId = fields.documentId?.getStringOrEmpty(root) ?: "",
+                )
+            }.getOrNull()
     }
 }

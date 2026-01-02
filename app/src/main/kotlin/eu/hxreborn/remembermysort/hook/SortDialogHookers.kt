@@ -16,32 +16,22 @@ import io.github.libxposed.api.annotations.XposedHooker
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
 
-// Intercepts touch events to detect long-press and auto-trigger sort selection
+// Hooks SortListFragment.onStart - intercepts touch events to detect long-press
 @XposedHooker
 class LongPressHooker : XposedInterface.Hooker {
     companion object {
-        // Flag: next sort should be per-folder (set before click in performLongPressClick)
-        @Volatile
-        var nextSortIsPerFolder = false
-
-        // Target folder key for per-folder save
-        @Volatile
-        var perFolderTargetKey: String? = null
-
-        // Set before click fires to prevent double-triggering on finger lift
-        @Volatile
-        var longPressConsumed = false
-
-        // Captured folder key when dialog opens (stable for dialog lifetime)
-        @Volatile
-        var dialogFolderKey: String? = null
+        @Volatile var nextSortIsPerFolder = false
+        @Volatile var perFolderTargetKey: String? = null
+        @Volatile var longPressConsumed = false
+        @Volatile var dialogFolderKey: String? = null
 
         private val mainHandler = Handler(Looper.getMainLooper())
         private var pendingLongPress: Runnable? = null
         private var pressedView: View? = null
         private var currentDecorView: View? = null
+        private var lastTouchX = 0f
+        private var lastTouchY = 0f
 
-        // Called from SortListFragment.onStart (dialog is visible)
         @JvmStatic
         @AfterInvocation
         fun afterOnStart(callback: AfterHookCallback) {
@@ -54,30 +44,21 @@ class LongPressHooker : XposedInterface.Hooker {
                 val window = getWindow.invoke(dialog) as? Window ?: return
 
                 currentDecorView = window.decorView
-
                 val originalCallback = window.callback ?: return
 
-                // Create a wrapper that intercepts dispatchTouchEvent
                 val handler = InvocationHandler { _, method, args ->
                     if (method.name == "dispatchTouchEvent" && args?.isNotEmpty() == true) {
-                        val event = args[0] as? MotionEvent
-                        handleTouchEvent(event)
+                        handleTouchEvent(args[0] as? MotionEvent)
                     }
-                    // Call original method
-                    if (args == null) {
-                        method.invoke(originalCallback)
-                    } else {
-                        method.invoke(originalCallback, *args)
-                    }
+                    if (args == null) method.invoke(originalCallback)
+                    else method.invoke(originalCallback, *args)
                 }
 
-                val proxy = Proxy.newProxyInstance(
+                window.callback = Proxy.newProxyInstance(
                     Window.Callback::class.java.classLoader,
                     arrayOf(Window.Callback::class.java),
                     handler,
-                )
-
-                window.callback = proxy as Window.Callback
+                ) as Window.Callback
                 dialogFolderKey = FolderContextHolder.get()?.toKey()
             }.onFailure {
                 log("LongPressHooker: failed to wrap callback", it)
@@ -122,15 +103,11 @@ class LongPressHooker : XposedInterface.Hooker {
             }
         }
 
-        private var lastTouchX = 0f
-        private var lastTouchY = 0f
-
         private fun performLongPressClick() {
             val view = pressedView ?: return
 
             view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
 
-            // Set per-folder flags before click triggers SortByUserHooker
             dialogFolderKey?.let { key ->
                 nextSortIsPerFolder = true
                 perFolderTargetKey = key
@@ -178,8 +155,7 @@ class LongPressHooker : XposedInterface.Hooker {
                     Float::class.javaPrimitiveType,
                     Float::class.javaPrimitiveType,
                 )
-                val childView = method.invoke(recyclerView, relativeX, relativeY) as? View
-                childView?.performClick()
+                (method.invoke(recyclerView, relativeX, relativeY) as? View)?.performClick()
             }.onFailure {
                 log("LongPressHooker: RecyclerView click failed", it)
             }
@@ -190,26 +166,32 @@ class LongPressHooker : XposedInterface.Hooker {
                 return if (isPointInsideView(x, y, parent) && parent.isClickable) parent else null
             }
 
-            // Check children in reverse order (top-most first)
             for (i in parent.childCount - 1 downTo 0) {
                 val child = parent.getChildAt(i)
                 if (child.visibility != View.VISIBLE) continue
-
-                val found = findViewAt(child, x, y)
-                if (found != null) return found
+                findViewAt(child, x, y)?.let { return it }
             }
 
-            // Check parent itself
             return if (isPointInsideView(x, y, parent) && parent.isClickable) parent else null
         }
 
         private fun isPointInsideView(x: Int, y: Int, view: View): Boolean {
             val location = IntArray(2)
             view.getLocationOnScreen(location)
-            val viewX = location[0]
-            val viewY = location[1]
-            return x >= viewX && x <= viewX + view.width &&
-                y >= viewY && y <= viewY + view.height
+            return x >= location[0] && x <= location[0] + view.width &&
+                y >= location[1] && y <= location[1] + view.height
+        }
+    }
+}
+
+// Hooks SortListFragment.onStop - clears dialog state
+@XposedHooker
+class SortDialogDismissHooker : XposedInterface.Hooker {
+    companion object {
+        @JvmStatic
+        @AfterInvocation
+        fun afterOnStop(@Suppress("UNUSED_PARAMETER") callback: AfterHookCallback) {
+            LongPressHooker.clearDialogState()
         }
     }
 }
