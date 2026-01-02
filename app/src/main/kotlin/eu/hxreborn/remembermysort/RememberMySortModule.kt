@@ -3,10 +3,10 @@ package eu.hxreborn.remembermysort
 import android.database.Cursor
 import eu.hxreborn.remembermysort.hook.DirectoryLoaderHooker
 import eu.hxreborn.remembermysort.hook.FolderLoaderHooker
+import eu.hxreborn.remembermysort.hook.LongPressHooker
 import eu.hxreborn.remembermysort.hook.SortByUserHooker
 import eu.hxreborn.remembermysort.hook.SortCursorHooker
 import eu.hxreborn.remembermysort.hook.SortDialogDismissHooker
-import eu.hxreborn.remembermysort.hook.TouchTimeTracker
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
@@ -74,7 +74,7 @@ class RememberMySortModule(
             runCatching {
                 val clazz = classLoader.loadClass(className)
 
-                hook(clazz.getMethod("onStart"), TouchTimeTracker::class.java)
+                hook(clazz.getMethod("onStart"), LongPressHooker::class.java)
                 log("Hooked $className.onStart")
 
                 hook(clazz.getMethod("onStop"), SortDialogDismissHooker::class.java)

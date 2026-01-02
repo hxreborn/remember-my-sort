@@ -11,41 +11,28 @@ private const val MAX_ENTRIES = 256
 
 internal object FolderSortPreferenceStore {
     private val context by lazy { ContextHelper.applicationContext }
-
-    private val cache = LinkedHashMap<String, SortPreference>(MAX_ENTRIES, 0.75f)
     private val lock = Any()
 
-    private val ensureInit: Unit by lazy {
-        loadFromDisk()
-        log("FolderSortPreferenceStore: initialized, ${cache.size} entries")
+    private val cache: LinkedHashMap<String, SortPreference> by lazy {
+        LinkedHashMap<String, SortPreference>(MAX_ENTRIES, 0.75f).apply {
+            loadFromDisk(this)
+        }
     }
 
-    fun load(folderKey: String): SortPreference {
-        ensureInit
-        return synchronized(lock) { cache[folderKey] } ?: GlobalSortPreferenceStore.load()
-    }
+    fun load(folderKey: String): SortPreference =
+        synchronized(lock) { cache[folderKey] } ?: GlobalSortPreferenceStore.load()
 
-    fun loadIfExists(folderKey: String): SortPreference? {
-        ensureInit
-        return synchronized(lock) { cache[folderKey] }
-    }
+    fun loadIfExists(folderKey: String): SortPreference? =
+        synchronized(lock) { cache[folderKey] }
 
     fun delete(folderKey: String): Boolean {
-        ensureInit
         val removed = synchronized(lock) {
             cache.remove(folderKey)?.also { writeToDiskLocked() }
-        }
-        if (removed != null) {
-            log("FolderSort: deleted per-folder pref for key=$folderKey")
         }
         return removed != null
     }
 
-    fun persist(
-        folderKey: String,
-        pref: SortPreference,
-    ): Boolean {
-        ensureInit
+    fun persist(folderKey: String, pref: SortPreference): Boolean {
         synchronized(lock) {
             if (cache[folderKey] == pref) return false
             cache[folderKey] = pref
@@ -55,14 +42,14 @@ internal object FolderSortPreferenceStore {
         return true
     }
 
-    private fun loadFromDisk() {
+    private fun loadFromDisk(into: MutableMap<String, SortPreference>) {
         File(context.filesDir, PREF_FILENAME)
             .takeIf { it.exists() }
             ?.runCatching {
                 readLines().filter { it.isNotBlank() }.forEach { line ->
                     runCatching {
                         JSONObject(line).let { json ->
-                            cache[json.getString("key")] =
+                            into[json.getString("key")] =
                                 SortPreference(
                                     position = json.getInt("pos"),
                                     dimId = json.getInt("dimId"),

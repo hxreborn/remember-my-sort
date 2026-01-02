@@ -49,13 +49,13 @@ class SortCursorHooker : XposedInterface.Hooker {
             val folderKey = FolderContextHolder.get()?.toKey()
 
             // Check if this is a per-folder save (from long-press in SortListFragment)
-            val isPerFolderSave = TouchTimeTracker.nextSortIsPerFolder
-            val perFolderTargetKey = TouchTimeTracker.perFolderTargetKey
+            val isPerFolderSave = LongPressHooker.nextSortIsPerFolder
+            val perFolderTargetKey = LongPressHooker.perFolderTargetKey
 
             if (isPerFolderSave && isUserSpecified && perFolderTargetKey != null) {
                 // Long-press triggered: save per-folder only, don't touch global
-                TouchTimeTracker.nextSortIsPerFolder = false
-                TouchTimeTracker.perFolderTargetKey = null
+                LongPressHooker.nextSortIsPerFolder = false
+                LongPressHooker.perFolderTargetKey = null
 
                 val pref = getCurrentSortPref(sortModel, fields) ?: return
                 FolderSortPreferenceStore.persist(perFolderTargetKey, pref)

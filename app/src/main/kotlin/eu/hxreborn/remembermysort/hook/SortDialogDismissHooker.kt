@@ -11,7 +11,7 @@ class SortDialogDismissHooker : XposedInterface.Hooker {
         @JvmStatic
         @AfterInvocation
         fun afterOnStop(@Suppress("UNUSED_PARAMETER") callback: AfterHookCallback) {
-            TouchTimeTracker.clearDialogState()
+            LongPressHooker.clearDialogState()
         }
     }
 }

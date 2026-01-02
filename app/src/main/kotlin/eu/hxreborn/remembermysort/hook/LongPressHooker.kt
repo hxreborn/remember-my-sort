@@ -16,9 +16,9 @@ import io.github.libxposed.api.annotations.XposedHooker
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
 
-// Tracks touch events via Window.Callback wrapper + auto-triggers click on long-press
+// Intercepts touch events to detect long-press and auto-trigger sort selection
 @XposedHooker
-class TouchTimeTracker : XposedInterface.Hooker {
+class LongPressHooker : XposedInterface.Hooker {
     companion object {
         // Touch down timestamp for long-press detection
         @Volatile
