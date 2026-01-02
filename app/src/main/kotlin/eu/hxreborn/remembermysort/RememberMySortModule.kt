@@ -4,7 +4,6 @@ import android.database.Cursor
 import eu.hxreborn.remembermysort.hook.DirectoryLoaderHooker
 import eu.hxreborn.remembermysort.hook.FolderLoaderHooker
 import eu.hxreborn.remembermysort.hook.LongPressHooker
-import eu.hxreborn.remembermysort.hook.SortByUserHooker
 import eu.hxreborn.remembermysort.hook.SortCursorHooker
 import eu.hxreborn.remembermysort.hook.SortDialogDismissHooker
 import io.github.libxposed.api.XposedInterface
@@ -26,9 +25,8 @@ class RememberMySortModule(
     override fun onPackageLoaded(param: PackageLoadedParam) {
         if (!param.isFirstPackage) return
 
-        // TODO: Improve this flow, global short must never fail
+        // SortCursor must never fail (global sort), others are optional (per-folder)
         hookSortCursor(param.classLoader)
-        hookSortByUser(param.classLoader)
         hookSortListFragment(param.classLoader)
         hookLoaders(param.classLoader)
 
@@ -49,21 +47,6 @@ class RememberMySortModule(
         }
     }
 
-    private fun hookSortByUser(classLoader: ClassLoader) {
-        runCatching {
-            val sortModel = classLoader.loadClass(SORT_MODEL_CLASS)
-            val method =
-                sortModel.getDeclaredMethod(
-                    SORT_BY_USER_METHOD,
-                    Int::class.javaPrimitiveType,
-                    Int::class.javaPrimitiveType,
-                )
-            hook(method, SortByUserHooker::class.java)
-            log("Hooked $SORT_BY_USER_METHOD")
-        }.onFailure { e ->
-            log("Failed to hook SortModel.sortByUser", e)
-        }
-    }
     private fun hookSortListFragment(classLoader: ClassLoader) {
         val sortFragmentClasses = listOf(
             SORT_LIST_FRAGMENT_CLASS,
@@ -116,7 +99,6 @@ class RememberMySortModule(
         private const val SORT_MODEL_CLASS = "com.android.documentsui.sorting.SortModel"
         private const val LOOKUP_CLASS = "com.android.documentsui.base.Lookup"
         private const val SORT_CURSOR_METHOD = "sortCursor"
-        private const val SORT_BY_USER_METHOD = "sortByUser"
         private const val DIRECTORY_LOADER_CLASS = "com.android.documentsui.DirectoryLoader"
         private const val FOLDER_LOADER_CLASS = "com.android.documentsui.loaders.FolderLoader"
         private const val LOAD_IN_BACKGROUND_METHOD = "loadInBackground"

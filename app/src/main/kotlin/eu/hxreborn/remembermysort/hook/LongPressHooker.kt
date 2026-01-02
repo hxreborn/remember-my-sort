@@ -20,19 +20,15 @@ import java.lang.reflect.Proxy
 @XposedHooker
 class LongPressHooker : XposedInterface.Hooker {
     companion object {
-        // Touch down timestamp for long-press detection
-        @Volatile
-        private var lastTouchDownTime = 0L
-
-        // Flag: next sort should be per-folder (set by SortByUserHooker)
+        // Flag: next sort should be per-folder (set before click in performLongPressClick)
         @Volatile
         var nextSortIsPerFolder = false
 
-        // Current folder key for per-folder save
+        // Target folder key for per-folder save
         @Volatile
         var perFolderTargetKey: String? = null
 
-        // Set when auto-release fires to prevent double-triggering on finger lift
+        // Set before click fires to prevent double-triggering on finger lift
         @Volatile
         var longPressConsumed = false
 
@@ -84,7 +80,7 @@ class LongPressHooker : XposedInterface.Hooker {
                 window.callback = proxy as Window.Callback
                 dialogFolderKey = FolderContextHolder.get()?.toKey()
             }.onFailure {
-                log("TouchTimeTracker: failed to wrap callback", it)
+                log("LongPressHooker: failed to wrap callback", it)
             }
         }
 
@@ -99,7 +95,6 @@ class LongPressHooker : XposedInterface.Hooker {
         private fun handleTouchEvent(event: MotionEvent?) {
             when (event?.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    lastTouchDownTime = System.currentTimeMillis()
                     lastTouchX = event.rawX
                     lastTouchY = event.rawY
                     longPressConsumed = false
@@ -109,9 +104,8 @@ class LongPressHooker : XposedInterface.Hooker {
                     }
 
                     cancelScheduledLongPress()
-                    val threshold = ViewConfiguration.getLongPressTimeout().toLong()
                     pendingLongPress = Runnable { performLongPressClick() }
-                    mainHandler.postDelayed(pendingLongPress!!, threshold)
+                    mainHandler.postDelayed(pendingLongPress!!, ViewConfiguration.getLongPressTimeout().toLong())
                 }
 
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -136,15 +130,19 @@ class LongPressHooker : XposedInterface.Hooker {
 
             view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
 
+            // Set per-folder flags before click triggers SortByUserHooker
+            dialogFolderKey?.let { key ->
+                nextSortIsPerFolder = true
+                perFolderTargetKey = key
+            }
+            longPressConsumed = true
+
             when {
                 view.javaClass.name.contains("ListView") -> clickListViewItem(view)
                 view.javaClass.name.contains("RecyclerView") -> clickRecyclerViewItem(view)
-                else -> {
-                    if (!view.performClick()) view.callOnClick()
-                }
+                else -> if (!view.performClick()) view.callOnClick()
             }
 
-            longPressConsumed = true
             pressedView = null
         }
 
@@ -164,7 +162,7 @@ class LongPressHooker : XposedInterface.Hooker {
                     lv.performItemClick(childView, position, itemId)
                 }
             }.onFailure {
-                log("TouchTimeTracker: ListView click failed", it)
+                log("LongPressHooker: ListView click failed", it)
             }
         }
 
@@ -183,7 +181,7 @@ class LongPressHooker : XposedInterface.Hooker {
                 val childView = method.invoke(recyclerView, relativeX, relativeY) as? View
                 childView?.performClick()
             }.onFailure {
-                log("TouchTimeTracker: RecyclerView click failed", it)
+                log("LongPressHooker: RecyclerView click failed", it)
             }
         }
 
@@ -212,11 +210,6 @@ class LongPressHooker : XposedInterface.Hooker {
             val viewY = location[1]
             return x >= viewX && x <= viewX + view.width &&
                 y >= viewY && y <= viewY + view.height
-        }
-
-        fun checkIfLongPress(): Boolean {
-            val elapsed = System.currentTimeMillis() - lastTouchDownTime
-            return elapsed >= ViewConfiguration.getLongPressTimeout()
         }
     }
 }
