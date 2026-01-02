@@ -6,7 +6,6 @@ import eu.hxreborn.remembermysort.data.FolderSortPreferenceStore
 import eu.hxreborn.remembermysort.data.GlobalSortPreferenceStore
 import eu.hxreborn.remembermysort.model.ReflectedDimension
 import eu.hxreborn.remembermysort.model.ReflectedSortModel
-import eu.hxreborn.remembermysort.model.Sort
 import eu.hxreborn.remembermysort.model.SortPreference
 import eu.hxreborn.remembermysort.util.ToastHelper
 import eu.hxreborn.remembermysort.util.accessibleField
@@ -96,38 +95,25 @@ class SortCursorHooker : XposedInterface.Hooker {
                 return
             }
 
-            // Apply saved sort if not user specified
-            // Check per-folder first, then fall back to global
+            // Apply saved sort: per-folder first, then global
+            val pref = folderKey?.let { FolderSortPreferenceStore.loadIfExists(it) }
+                ?: GlobalSortPreferenceStore.load()
+                ?: return
+
             val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return
-
-            val pref =
-                folderKey?.let { FolderSortPreferenceStore.loadIfExists(it) }
-                    ?: GlobalSortPreferenceStore.load()
-
-            if (pref.position >= 0) {
-                applyPrefToDimensions(sortModel, fields, dimensions, pref)
-                instanceState[sortModel] = AppliedState(folderKey ?: GLOBAL_STATE_KEY, pref)
-            }
+            applyPrefToDimensions(sortModel, fields, dimensions, pref)
+            instanceState[sortModel] = AppliedState(folderKey ?: GLOBAL_STATE_KEY, pref)
         }
 
-        private fun getCurrentSortPref(
-            sortModel: Any,
-            fields: ReflectedSortModel,
-        ): SortPreference? {
+        private fun getCurrentSortPref(sortModel: Any, fields: ReflectedSortModel): SortPreference? {
             val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return null
             val currentDim = fields.sortedDimension.get(sortModel) ?: return null
-            val dimFields =
-                runCatching { getDimensionFields(currentDim.javaClass) }
-                    .getOrNull() ?: return null
+            val dimFields = runCatching { getDimensionFields(currentDim.javaClass) }.getOrNull() ?: return null
 
-            val dimId = dimFields.id.getInt(currentDim)
             val direction = dimFields.sortDirection.getInt(currentDim)
-            val position =
-                (0 until dimensions.size())
-                    .firstOrNull { dimensions.valueAt(it) === currentDim }
-                    ?: return null
+            val position = (0 until dimensions.size()).firstOrNull { dimensions.valueAt(it) === currentDim } ?: return null
 
-            return SortPreference(position, dimId, direction)
+            return SortPreference(position, direction)
         }
 
         private fun applyPrefToDimensions(
@@ -136,46 +122,13 @@ class SortCursorHooker : XposedInterface.Hooker {
             dimensions: SparseArray<*>,
             pref: SortPreference,
         ) {
-            val positionValid = pref.position in 0 until dimensions.size()
-            val candidateDim = if (positionValid) dimensions.valueAt(pref.position) else null
-            val dimFields =
-                candidateDim?.let {
-                    runCatching { getDimensionFields(it.javaClass) }.getOrNull()
-                }
-            val actualDimId: Int? = dimFields?.runCatching {
-                id.getInt(candidateDim)
-            }?.getOrNull()
+            if (pref.position !in 0 until dimensions.size()) return
+            val targetDim = dimensions.valueAt(pref.position) ?: return
+            val dimFields = runCatching { getDimensionFields(targetDim.javaClass) }.getOrNull() ?: return
 
-            val targetDim =
-                when {
-                    positionValid && actualDimId == pref.dimId -> candidateDim
-                    else -> {
-                        if (actualDimId == null) {
-                            log("SortCursor: reflection failed for dimension at pos=${pref.position}")
-                        } else {
-                            log("SortCursor: dimId mismatch, pos=${pref.position} expected=${pref.dimId} got=$actualDimId")
-                        }
-                        findDateDimension(dimensions)
-                    }
-                } ?: return
-
-            val targetDimFields =
-                runCatching { getDimensionFields(targetDim.javaClass) }
-                    .getOrNull() ?: return
-
-            targetDimFields.sortDirection.setInt(targetDim, pref.direction)
+            dimFields.sortDirection.setInt(targetDim, pref.direction)
             fields.sortedDimension.set(sortModel, targetDim)
         }
-
-        private fun findDateDimension(dimensions: SparseArray<*>): Any? =
-            (0 until dimensions.size()).firstNotNullOfOrNull { i ->
-                dimensions.valueAt(i)?.takeIf { dim ->
-                    val dimFields =
-                        runCatching { getDimensionFields(dim.javaClass) }
-                            .getOrNull() ?: return@takeIf false
-                    dimFields.defaultSortDirection.getInt(dim) == Sort.DIRECTION_DESC
-                }
-            }
 
         private fun getSortModelFields(clazz: Class<*>): ReflectedSortModel =
             sortModelFields?.takeIf { it.clazz == clazz } ?: ReflectedSortModel(
@@ -186,11 +139,7 @@ class SortCursorHooker : XposedInterface.Hooker {
             ).also { sortModelFields = it }
 
         private fun getDimensionFields(clazz: Class<*>): ReflectedDimension =
-            dimensionFields?.takeIf { it.clazz == clazz } ?: ReflectedDimension(
-                clazz = clazz,
-                id = clazz.accessibleField("mId"),
-                sortDirection = clazz.accessibleField("mSortDirection"),
-                defaultSortDirection = clazz.accessibleField("mDefaultSortDirection"),
-            ).also { dimensionFields = it }
+            dimensionFields?.takeIf { it.clazz == clazz }
+                ?: ReflectedDimension(clazz, clazz.accessibleField("mSortDirection")).also { dimensionFields = it }
     }
 }

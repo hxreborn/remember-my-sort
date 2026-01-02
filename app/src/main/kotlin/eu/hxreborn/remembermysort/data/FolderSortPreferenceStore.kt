@@ -19,9 +19,6 @@ internal object FolderSortPreferenceStore {
         }
     }
 
-    fun load(folderKey: String): SortPreference =
-        synchronized(lock) { cache[folderKey] } ?: GlobalSortPreferenceStore.load()
-
     fun loadIfExists(folderKey: String): SortPreference? =
         synchronized(lock) { cache[folderKey] }
 
@@ -49,45 +46,36 @@ internal object FolderSortPreferenceStore {
                 readLines().filter { it.isNotBlank() }.forEach { line ->
                     runCatching {
                         JSONObject(line).let { json ->
-                            into[json.getString("key")] =
-                                SortPreference(
-                                    position = json.getInt("pos"),
-                                    dimId = json.getInt("dimId"),
-                                    direction = json.getInt("dir"),
-                                )
+                            into[json.getString("key")] = SortPreference(
+                                position = json.getInt("pos"),
+                                direction = json.getInt("dir"),
+                            )
                         }
-                    }.onFailure { log("FolderSort: failed to parse line: $line") }
+                    }
                 }
-            }?.onFailure { e -> log("FolderSort: failed to load from disk", e) }
+            }
     }
 
-    // Caller must hold lock
     private fun writeToDiskLocked() {
         runCatching {
             val tempFile = File(context.filesDir, "$PREF_FILENAME.tmp")
             val targetFile = File(context.filesDir, PREF_FILENAME)
 
             tempFile.bufferedWriter().use { writer ->
-                // I/O stays under the lock because the capped map is small and avoids snapshot copies
                 cache.forEach { (key, pref) ->
-                    val json =
-                        JSONObject().apply {
-                            put("key", key)
-                            put("pos", pref.position)
-                            put("dimId", pref.dimId)
-                            put("dir", pref.direction)
-                        }
+                    val json = JSONObject().apply {
+                        put("key", key)
+                        put("pos", pref.position)
+                        put("dir", pref.direction)
+                    }
                     writer.write(json.toString())
                     writer.newLine()
                 }
             }
 
             if (!tempFile.renameTo(targetFile)) {
-                tempFile.copyTo(targetFile, overwrite = true)
-                tempFile.delete()
+                tempFile.copyTo(targetFile, overwrite = true).also { tempFile.delete() }
             }
-        }.onFailure { e ->
-            log("FolderSort: failed to write to disk", e)
         }
     }
 
