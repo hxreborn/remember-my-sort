@@ -1,7 +1,6 @@
 package eu.hxreborn.remembermysort.hook
 
 import android.util.SparseArray
-import eu.hxreborn.remembermysort.R
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import eu.hxreborn.remembermysort.data.FolderSortPreferenceStore
 import eu.hxreborn.remembermysort.data.GlobalSortPreferenceStore
@@ -70,7 +69,7 @@ class SortCursorHooker : XposedInterface.Hooker {
                         .substringAfterLast(':')
                         .substringAfterLast('/')
                         .ifEmpty { "folder" }
-                ToastHelper.show(R.string.toast_folder_sort_saved, displayName)
+                ToastHelper.show("Sort saved for $displayName")
 
                 // Update instance state
                 instanceState[sortModel] = AppliedState(perFolderTargetKey, pref)
@@ -97,9 +96,9 @@ class SortCursorHooker : XposedInterface.Hooker {
                 fields.isUserSpecified.setBoolean(sortModel, false)
 
                 if (hadOverride) {
-                    ToastHelper.show(R.string.toast_folder_override_cleared)
+                    ToastHelper.show("Folder override cleared")
                 }
-                ToastHelper.show(R.string.toast_global_sort_saved)
+                ToastHelper.show("Global sort saved")
                 log("SortCursor: saved global sort")
                 return
             }
