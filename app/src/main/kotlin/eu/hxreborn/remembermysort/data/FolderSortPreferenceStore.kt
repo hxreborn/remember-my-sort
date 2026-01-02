@@ -7,8 +7,6 @@ import org.json.JSONObject
 import java.io.File
 
 private const val PREF_FILENAME = "rms_folder_prefs"
-private const val OLD_GLOBAL_FILE = "rms_pref"
-private const val MIGRATED_MARKER = "rms_migrated"
 private const val MAX_ENTRIES = 256
 
 internal object FolderSortPreferenceStore {
@@ -18,25 +16,18 @@ internal object FolderSortPreferenceStore {
     private val lock = Any()
 
     private val ensureInit: Unit by lazy {
-        // TODO: Improve, not necessary 
-        migrateIfNeeded()
         loadFromDisk()
         log("FolderSortPreferenceStore: initialized, ${cache.size} entries")
     }
 
     fun load(folderKey: String): SortPreference {
         ensureInit
-        return synchronized(lock) { cache[folderKey] }
-            ?.also { log("FolderSort: loaded from per-folder, key=$folderKey") }
-            ?: GlobalSortPreferenceStore.load().also {
-                log("FolderSort: fallback to global for key=$folderKey")
-            }
+        return synchronized(lock) { cache[folderKey] } ?: GlobalSortPreferenceStore.load()
     }
 
     fun loadIfExists(folderKey: String): SortPreference? {
         ensureInit
         return synchronized(lock) { cache[folderKey] }
-            ?.also { log("FolderSort: found override for key=$folderKey") }
     }
 
     fun delete(folderKey: String): Boolean {
@@ -61,23 +52,7 @@ internal object FolderSortPreferenceStore {
             evictIfNeeded()
             writeToDiskLocked()
         }
-        log("FolderSort: persisted to per-folder, key=$folderKey, pref=$pref")
         return true
-    }
-
-    private fun migrateIfNeeded() {
-        val markerFile =
-            File(context.filesDir, MIGRATED_MARKER).takeUnless { it.exists() } ?: return
-
-        File(context.filesDir, OLD_GLOBAL_FILE).takeIf { it.exists() }?.let {
-            GlobalSortPreferenceStore.load().takeIf { it != SortPreference.DEFAULT }?.let {
-                log(
-                    "FolderSort: migration complete, global pref preserved in GlobalSortPreferenceStore",
-                )
-            }
-        }
-
-        runCatching { markerFile.createNewFile() }
     }
 
     private fun loadFromDisk() {
@@ -96,7 +71,6 @@ internal object FolderSortPreferenceStore {
                         }
                     }.onFailure { log("FolderSort: failed to parse line: $line") }
                 }
-                log("FolderSort: loaded ${cache.size} entries from disk")
             }?.onFailure { e -> log("FolderSort: failed to load from disk", e) }
     }
 
@@ -122,12 +96,9 @@ internal object FolderSortPreferenceStore {
             }
 
             if (!tempFile.renameTo(targetFile)) {
-                // Atomic rename failed - fallback to copy+delete
                 tempFile.copyTo(targetFile, overwrite = true)
                 tempFile.delete()
             }
-
-            log("FolderSort: wrote ${cache.size} entries to disk")
         }.onFailure { e ->
             log("FolderSort: failed to write to disk", e)
         }

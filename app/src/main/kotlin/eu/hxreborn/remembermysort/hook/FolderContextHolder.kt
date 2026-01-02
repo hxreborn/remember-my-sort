@@ -33,6 +33,14 @@ data class FolderContext(
 ) {
     fun toKey(): String = "$userId:$authority:$rootId:$documentId"
 
+    fun displayName(): String =
+        documentId
+            .split('/')
+            .filter { it.isNotEmpty() }
+            .lastOrNull()
+            ?: rootId.takeIf { it.isNotEmpty() }
+            ?: "folder"
+
     companion object {
         fun extractUserId(userIdObj: Any?): Int =
             userIdObj?.let {

@@ -63,14 +63,7 @@ class SortCursorHooker : XposedInterface.Hooker {
                 // Clear isUserSpecified to prevent subsequent global save
                 fields.isUserSpecified.setBoolean(sortModel, false)
 
-                // Show toast with folder name (extract from key for display)
-                val displayName =
-                    perFolderTargetKey
-                        .substringAfterLast(':')
-                        .substringAfterLast('/')
-                        .ifEmpty { "folder" }
-                // TODO: Improve readable names 
-                // TODO: Make it more robust as well 
+                val displayName = FolderContextHolder.get()?.displayName() ?: "folder"
                 ToastHelper.show("Sort saved for $displayName")
 
                 // Update instance state
@@ -97,11 +90,12 @@ class SortCursorHooker : XposedInterface.Hooker {
                 // Clear flag to ensure next folder load applies saved sort
                 fields.isUserSpecified.setBoolean(sortModel, false)
 
-                // TODO: Avoid showing 2 toasts, combine if hadOverride == true 
-                if (hadOverride) {
-                    ToastHelper.show("Folder override cleared")
+                val message = if (hadOverride) {
+                    "Global sort saved (folder override cleared)"
+                } else {
+                    "Global sort saved"
                 }
-                ToastHelper.show("Global sort saved")
+                ToastHelper.show(message)
                 log("SortCursor: saved global sort")
                 return
             }
@@ -152,22 +146,19 @@ class SortCursorHooker : XposedInterface.Hooker {
                 candidateDim?.let {
                     runCatching { getDimensionFields(it.javaClass) }.getOrNull()
                 }
-            val actualDimId = dimFields?.id?.getInt(candidateDim) ?: -1 // TODO: Remove this sentinel if possible 
-            val dimIdMatches = actualDimId == pref.dimId
+            val actualDimId: Int? = dimFields?.runCatching {
+                id.getInt(candidateDim)
+            }?.getOrNull()
 
             val targetDim =
                 when {
-                    positionValid && dimIdMatches -> {
-                        candidateDim
-                    }
-
+                    positionValid && actualDimId == pref.dimId -> candidateDim
                     else -> {
-                        log(
-                            "SortCursor: dimId mismatch, pos=${pref.position} " +
-                                "expected=${pref.dimId} got=$actualDimId",
-                        )
-                        // Fallback to Date dimension if available
-                        // TODO: FIX probably not working now
+                        if (actualDimId == null) {
+                            log("SortCursor: reflection failed for dimension at pos=${pref.position}")
+                        } else {
+                            log("SortCursor: dimId mismatch, pos=${pref.position} expected=${pref.dimId} got=$actualDimId")
+                        }
                         findDateDimension(dimensions)
                     }
                 } ?: return

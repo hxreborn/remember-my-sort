@@ -16,8 +16,7 @@ import io.github.libxposed.api.annotations.XposedHooker
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
 
-// Tracks touch down time via Window.Callback wrapper + auto-release on long-press
-// TODO: Simplify, add cohesive nomenclature 
+// Tracks touch events via Window.Callback wrapper + auto-triggers click on long-press
 @XposedHooker
 class TouchTimeTracker : XposedInterface.Hooker {
     companion object {
@@ -33,9 +32,16 @@ class TouchTimeTracker : XposedInterface.Hooker {
         @Volatile
         var perFolderTargetKey: String? = null
 
-        // For auto-release
+        // Set when auto-release fires to prevent double-triggering on finger lift
+        @Volatile
+        var longPressConsumed = false
+
+        // Captured folder key when dialog opens (stable for dialog lifetime)
+        @Volatile
+        var dialogFolderKey: String? = null
+
         private val mainHandler = Handler(Looper.getMainLooper())
-        private var pendingAutoRelease: Runnable? = null
+        private var pendingLongPress: Runnable? = null
         private var pressedView: View? = null
         private var currentDecorView: View? = null
 
@@ -51,16 +57,9 @@ class TouchTimeTracker : XposedInterface.Hooker {
                 val getWindow = dialog.javaClass.getMethod("getWindow")
                 val window = getWindow.invoke(dialog) as? Window ?: return
 
-                // Store DecorView for finding touched view
                 currentDecorView = window.decorView
-                log("TouchTimeTracker: decorView=${currentDecorView?.javaClass?.simpleName}")
 
-                // Wrap the window callback to intercept touch events
-                val originalCallback = window.callback
-                if (originalCallback == null) {
-                    log("TouchTimeTracker: window callback is null")
-                    return
-                }
+                val originalCallback = window.callback ?: return
 
                 // Create a wrapper that intercepts dispatchTouchEvent
                 val handler = InvocationHandler { _, method, args ->
@@ -83,10 +82,18 @@ class TouchTimeTracker : XposedInterface.Hooker {
                 )
 
                 window.callback = proxy as Window.Callback
-                log("TouchTimeTracker: wrapped window callback")
+                dialogFolderKey = FolderContextHolder.get()?.toKey()
             }.onFailure {
                 log("TouchTimeTracker: failed to wrap callback", it)
             }
+        }
+
+        fun clearDialogState() {
+            dialogFolderKey = null
+            longPressConsumed = false
+            cancelScheduledLongPress()
+            pressedView = null
+            currentDecorView = null
         }
 
         private fun handleTouchEvent(event: MotionEvent?) {
@@ -95,103 +102,65 @@ class TouchTimeTracker : XposedInterface.Hooker {
                     lastTouchDownTime = System.currentTimeMillis()
                     lastTouchX = event.rawX
                     lastTouchY = event.rawY
-                    log("TouchTimeTracker: DOWN at ($lastTouchX, $lastTouchY)")
+                    longPressConsumed = false
 
-                    // Find the view at touch coordinates
-                    val decorView = currentDecorView
-                    if (decorView != null) {
+                    currentDecorView?.let { decorView ->
                         pressedView = findViewAt(decorView, event.rawX.toInt(), event.rawY.toInt())
-                        log("TouchTimeTracker: pressedView=${pressedView?.javaClass?.name}")
-                        debugViewHierarchy(decorView, 0)
                     }
 
-                    // Schedule auto-release after long-press threshold
-                    cancelPendingAutoRelease()
+                    cancelScheduledLongPress()
                     val threshold = ViewConfiguration.getLongPressTimeout().toLong()
-                    pendingAutoRelease = Runnable {
-                        log("TouchTimeTracker: AUTO-RELEASE triggered after ${threshold}ms")
-                        triggerAutoRelease()
-                    }
-                    mainHandler.postDelayed(pendingAutoRelease!!, threshold)
+                    pendingLongPress = Runnable { performLongPressClick() }
+                    mainHandler.postDelayed(pendingLongPress!!, threshold)
                 }
 
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    log("TouchTimeTracker: ${if (event.action == MotionEvent.ACTION_UP) "UP" else "CANCEL"}")
-                    cancelPendingAutoRelease()
+                    cancelScheduledLongPress()
                     pressedView = null
                 }
             }
         }
 
-        private fun cancelPendingAutoRelease() {
-            pendingAutoRelease?.let {
+        private fun cancelScheduledLongPress() {
+            pendingLongPress?.let {
                 mainHandler.removeCallbacks(it)
-                pendingAutoRelease = null
+                pendingLongPress = null
             }
         }
 
         private var lastTouchX = 0f
         private var lastTouchY = 0f
 
-        private fun triggerAutoRelease() {
-            val view = pressedView
-            if (view == null) {
-                log("TouchTimeTracker: no pressedView for auto-release")
-                return
-            }
+        private fun performLongPressClick() {
+            val view = pressedView ?: return
 
-            // Haptic feedback
             view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            log("TouchTimeTracker: haptic sent")
 
-            // Handle ListView specially
-            if (view.javaClass.name.contains("ListView")) {
-                log("TouchTimeTracker: detected ListView, using performItemClick")
-                handleListViewClick(view)
-                pressedView = null
-                return
+            when {
+                view.javaClass.name.contains("ListView") -> clickListViewItem(view)
+                view.javaClass.name.contains("RecyclerView") -> clickRecyclerViewItem(view)
+                else -> {
+                    if (!view.performClick()) view.callOnClick()
+                }
             }
 
-            // Handle RecyclerView specially
-            if (view.javaClass.name.contains("RecyclerView")) {
-                log("TouchTimeTracker: detected RecyclerView, finding child")
-                handleRecyclerViewClick(view)
-                pressedView = null
-                return
-            }
-
-            // Try to click the view directly
-            log("TouchTimeTracker: calling performClick on ${view.javaClass.name}")
-            val clicked = view.performClick()
-            log("TouchTimeTracker: performClick returned $clicked")
-
-            // If performClick didn't work, try callOnClick
-            if (!clicked) {
-                log("TouchTimeTracker: trying callOnClick")
-                view.callOnClick()
-            }
-
+            longPressConsumed = true
             pressedView = null
         }
 
-        private fun handleListViewClick(listView: View) {
+        private fun clickListViewItem(listView: View) {
             runCatching {
                 val lv = listView as android.widget.ListView
-                // Find position at touch coordinates
                 val location = IntArray(2)
                 lv.getLocationOnScreen(location)
                 val relativeY = (lastTouchY - location[1]).toInt()
                 val position = lv.pointToPosition(lastTouchX.toInt() - location[0], relativeY)
-
-                log("TouchTimeTracker: ListView position=$position at relY=$relativeY")
 
                 if (position >= 0) {
                     val firstVisible = lv.firstVisiblePosition
                     val childIndex = position - firstVisible
                     val childView = lv.getChildAt(childIndex)
                     val itemId = lv.adapter?.getItemId(position) ?: 0L
-
-                    log("TouchTimeTracker: calling performItemClick pos=$position, id=$itemId")
                     lv.performItemClick(childView, position, itemId)
                 }
             }.onFailure {
@@ -199,26 +168,20 @@ class TouchTimeTracker : XposedInterface.Hooker {
             }
         }
 
-        private fun handleRecyclerViewClick(recyclerView: View) {
+        private fun clickRecyclerViewItem(recyclerView: View) {
             runCatching {
                 val location = IntArray(2)
                 recyclerView.getLocationOnScreen(location)
                 val relativeX = lastTouchX - location[0]
                 val relativeY = lastTouchY - location[1]
 
-                // Use reflection to call findChildViewUnder
                 val method = recyclerView.javaClass.getMethod(
                     "findChildViewUnder",
                     Float::class.javaPrimitiveType,
                     Float::class.javaPrimitiveType,
                 )
                 val childView = method.invoke(recyclerView, relativeX, relativeY) as? View
-
-                log("TouchTimeTracker: RecyclerView childView=${childView?.javaClass?.name}")
-
-                if (childView != null) {
-                    childView.performClick()
-                }
+                childView?.performClick()
             }.onFailure {
                 log("TouchTimeTracker: RecyclerView click failed", it)
             }
@@ -251,28 +214,9 @@ class TouchTimeTracker : XposedInterface.Hooker {
                 y >= viewY && y <= viewY + view.height
         }
 
-        private fun debugViewHierarchy(view: View, depth: Int) {
-            if (depth > 5) return // Limit depth
-            val indent = "  ".repeat(depth)
-            val clickable = if (view.isClickable) "[CLICK]" else ""
-            val id = runCatching {
-                if (view.id != View.NO_ID) view.resources.getResourceEntryName(view.id) else "no-id"
-            }.getOrDefault("no-id")
-            log("TouchTimeTracker: $indent${view.javaClass.simpleName} id=$id $clickable")
-
-            if (view is ViewGroup) {
-                for (i in 0 until minOf(view.childCount, 10)) {
-                    debugViewHierarchy(view.getChildAt(i), depth + 1)
-                }
-            }
-        }
-
         fun checkIfLongPress(): Boolean {
             val elapsed = System.currentTimeMillis() - lastTouchDownTime
-            val threshold = ViewConfiguration.getLongPressTimeout().toLong()
-            val isLong = elapsed >= threshold
-            log("TouchTimeTracker: elapsed=${elapsed}ms, threshold=${threshold}ms, isLong=$isLong")
-            return isLong
+            return elapsed >= ViewConfiguration.getLongPressTimeout()
         }
     }
 }

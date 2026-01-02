@@ -12,24 +12,20 @@ class SortByUserHooker : XposedInterface.Hooker {
         @JvmStatic
         @BeforeInvocation
         fun beforeSortByUser(callback: BeforeHookCallback) {
-            val dimensionId = callback.args?.getOrNull(0) as? Int ?: return
-            val direction = callback.args?.getOrNull(1) as? Int ?: return
+            callback.args?.getOrNull(0) as? Int ?: return
+            callback.args?.getOrNull(1) as? Int ?: return
 
-            log("SortByUser: called with dimensionId=$dimensionId, direction=$direction")
+            // Skip if long-press was already handled by auto-release
+            if (TouchTimeTracker.longPressConsumed) return
 
-            val isLongPress = TouchTimeTracker.checkIfLongPress()
-
-            if (isLongPress) {
-                val folderKey = FolderContextHolder.get()?.toKey()
+            if (TouchTimeTracker.checkIfLongPress()) {
+                val folderKey = TouchTimeTracker.dialogFolderKey
                 if (folderKey != null) {
                     TouchTimeTracker.nextSortIsPerFolder = true
                     TouchTimeTracker.perFolderTargetKey = folderKey
-                    log("SortByUser: long-press detected, will save per-folder for key=$folderKey")
                 } else {
-                    log("SortByUser: long-press detected but no folder context available")
+                    log("SortByUser: long-press but no folder context")
                 }
-            } else {
-                log("SortByUser: normal tap, will save globally")
             }
         }
     }

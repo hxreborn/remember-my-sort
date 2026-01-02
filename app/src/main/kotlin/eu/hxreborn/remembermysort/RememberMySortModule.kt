@@ -5,6 +5,7 @@ import eu.hxreborn.remembermysort.hook.DirectoryLoaderHooker
 import eu.hxreborn.remembermysort.hook.FolderLoaderHooker
 import eu.hxreborn.remembermysort.hook.SortByUserHooker
 import eu.hxreborn.remembermysort.hook.SortCursorHooker
+import eu.hxreborn.remembermysort.hook.SortDialogDismissHooker
 import eu.hxreborn.remembermysort.hook.TouchTimeTracker
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
@@ -25,10 +26,10 @@ class RememberMySortModule(
     override fun onPackageLoaded(param: PackageLoadedParam) {
         if (!param.isFirstPackage) return
 
-        // TODO: Improve this flow, global short must never fail 
+        // TODO: Improve this flow, global short must never fail
         hookSortCursor(param.classLoader)
         hookSortByUser(param.classLoader)
-        hookSortListFragmentOnStart(param.classLoader)
+        hookSortListFragment(param.classLoader)
         hookLoaders(param.classLoader)
 
         log("Module initialized in ${param.packageName}")
@@ -63,22 +64,23 @@ class RememberMySortModule(
             log("Failed to hook SortModel.sortByUser", e)
         }
     }
-    // set up touch tracking when "sort by" dialog is visible
-    private fun hookSortListFragmentOnStart(classLoader: ClassLoader) {
-        val sortFragmentClasses =
-            listOf(
-                SORT_LIST_FRAGMENT_CLASS,
-                SORT_LIST_FRAGMENT_CLASS_GOOGLE,
-            )
-    // TODO: use for-each
+    private fun hookSortListFragment(classLoader: ClassLoader) {
+        val sortFragmentClasses = listOf(
+            SORT_LIST_FRAGMENT_CLASS,
+            SORT_LIST_FRAGMENT_CLASS_GOOGLE,
+        )
+
         for (className in sortFragmentClasses) {
             runCatching {
                 val clazz = classLoader.loadClass(className)
-                val onStart = clazz.getMethod("onStart")
-                hook(onStart, TouchTimeTracker::class.java)
-                log("Hooked $className.onStart for touch tracking")
+
+                hook(clazz.getMethod("onStart"), TouchTimeTracker::class.java)
+                log("Hooked $className.onStart")
+
+                hook(clazz.getMethod("onStop"), SortDialogDismissHooker::class.java)
+                log("Hooked $className.onStop")
             }.onFailure { e ->
-                log("$className.onStart not found: ${e.message}")
+                log("$className not found: ${e.message}")
             }
         }
     }
