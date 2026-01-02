@@ -73,7 +73,7 @@ class SortCursorHooker : XposedInterface.Hooker {
             }
 
             if (isUserSpecified) {
-                // Normal tap: save to global + :clear any per-folder override
+                // Normal tap: save to global + clear any per-folder override
                 val pref = getCurrentSortPref(sortModel, fields) ?: return
                 val state = instanceState[sortModel]
                 if (pref == state?.pref && state.key == GLOBAL_STATE_KEY) {
@@ -90,11 +90,7 @@ class SortCursorHooker : XposedInterface.Hooker {
                 // Clear flag to ensure next folder load applies saved sort
                 fields.isUserSpecified.setBoolean(sortModel, false)
 
-                val message = if (hadOverride) {
-                    "Global sort saved (folder override cleared)"
-                } else {
-                    "Global sort saved"
-                }
+                val message = if (hadOverride) "Global sort saved (folder override cleared)" else "Global sort saved"
                 ToastHelper.show(message)
                 log("SortCursor: saved global sort")
                 return

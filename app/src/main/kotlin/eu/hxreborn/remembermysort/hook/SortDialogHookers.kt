@@ -13,6 +13,7 @@ import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedInterface.AfterHookCallback
 import io.github.libxposed.api.annotations.AfterInvocation
 import io.github.libxposed.api.annotations.XposedHooker
+import java.lang.ref.WeakReference
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
 
@@ -27,10 +28,8 @@ class LongPressHooker : XposedInterface.Hooker {
 
         private val mainHandler = Handler(Looper.getMainLooper())
         private var pendingLongPress: Runnable? = null
-        private var pressedView: View? = null
-        private var currentDecorView: View? = null
-        private var lastTouchX = 0f
-        private var lastTouchY = 0f
+        private var pressedView: WeakReference<View>? = null
+        private var currentDecorView: WeakReference<View>? = null
 
         @JvmStatic
         @AfterInvocation
@@ -43,7 +42,7 @@ class LongPressHooker : XposedInterface.Hooker {
                 val getWindow = dialog.javaClass.getMethod("getWindow")
                 val window = getWindow.invoke(dialog) as? Window ?: return
 
-                currentDecorView = window.decorView
+                currentDecorView = WeakReference(window.decorView)
                 val originalCallback = window.callback ?: return
 
                 val handler = InvocationHandler { _, method, args ->
@@ -76,16 +75,16 @@ class LongPressHooker : XposedInterface.Hooker {
         private fun handleTouchEvent(event: MotionEvent?) {
             when (event?.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    lastTouchX = event.rawX
-                    lastTouchY = event.rawY
                     longPressConsumed = false
+                    val x = event.rawX
+                    val y = event.rawY
 
-                    currentDecorView?.let { decorView ->
-                        pressedView = findViewAt(decorView, event.rawX.toInt(), event.rawY.toInt())
+                    currentDecorView?.get()?.let { decorView ->
+                        findListView(decorView)?.let { pressedView = WeakReference(it) }
                     }
 
                     cancelScheduledLongPress()
-                    pendingLongPress = Runnable { performLongPressClick() }
+                    pendingLongPress = Runnable { performLongPressClick(x, y) }
                     mainHandler.postDelayed(pendingLongPress!!, ViewConfiguration.getLongPressTimeout().toLong())
                 }
 
@@ -103,10 +102,10 @@ class LongPressHooker : XposedInterface.Hooker {
             }
         }
 
-        private fun performLongPressClick() {
-            val view = pressedView ?: return
+        private fun performLongPressClick(x: Float, y: Float) {
+            val listView = pressedView?.get() as? android.widget.ListView ?: return
 
-            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            listView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
 
             dialogFolderKey?.let { key ->
                 nextSortIsPerFolder = true
@@ -114,72 +113,30 @@ class LongPressHooker : XposedInterface.Hooker {
             }
             longPressConsumed = true
 
-            when {
-                view.javaClass.name.contains("ListView") -> clickListViewItem(view)
-                view.javaClass.name.contains("RecyclerView") -> clickRecyclerViewItem(view)
-                else -> if (!view.performClick()) view.callOnClick()
+            // Find which item was pressed and click it
+            val location = IntArray(2)
+            listView.getLocationOnScreen(location)
+            val relativeX = x.toInt() - location[0]
+            val relativeY = y.toInt() - location[1]
+            val position = listView.pointToPosition(relativeX, relativeY)
+
+            if (position >= 0) {
+                val childIndex = position - listView.firstVisiblePosition
+                val childView = listView.getChildAt(childIndex)
+                val itemId = listView.adapter?.getItemId(position) ?: 0L
+                listView.performItemClick(childView, position, itemId)
             }
 
             pressedView = null
         }
 
-        private fun clickListViewItem(listView: View) {
-            runCatching {
-                val lv = listView as android.widget.ListView
-                val location = IntArray(2)
-                lv.getLocationOnScreen(location)
-                val relativeY = (lastTouchY - location[1]).toInt()
-                val position = lv.pointToPosition(lastTouchX.toInt() - location[0], relativeY)
-
-                if (position >= 0) {
-                    val firstVisible = lv.firstVisiblePosition
-                    val childIndex = position - firstVisible
-                    val childView = lv.getChildAt(childIndex)
-                    val itemId = lv.adapter?.getItemId(position) ?: 0L
-                    lv.performItemClick(childView, position, itemId)
-                }
-            }.onFailure {
-                log("LongPressHooker: ListView click failed", it)
+        private fun findListView(parent: View): android.widget.ListView? {
+            if (parent is android.widget.ListView) return parent
+            if (parent !is ViewGroup) return null
+            for (i in 0 until parent.childCount) {
+                findListView(parent.getChildAt(i))?.let { return it }
             }
-        }
-
-        private fun clickRecyclerViewItem(recyclerView: View) {
-            runCatching {
-                val location = IntArray(2)
-                recyclerView.getLocationOnScreen(location)
-                val relativeX = lastTouchX - location[0]
-                val relativeY = lastTouchY - location[1]
-
-                val method = recyclerView.javaClass.getMethod(
-                    "findChildViewUnder",
-                    Float::class.javaPrimitiveType,
-                    Float::class.javaPrimitiveType,
-                )
-                (method.invoke(recyclerView, relativeX, relativeY) as? View)?.performClick()
-            }.onFailure {
-                log("LongPressHooker: RecyclerView click failed", it)
-            }
-        }
-
-        private fun findViewAt(parent: View, x: Int, y: Int): View? {
-            if (parent !is ViewGroup) {
-                return if (isPointInsideView(x, y, parent) && parent.isClickable) parent else null
-            }
-
-            for (i in parent.childCount - 1 downTo 0) {
-                val child = parent.getChildAt(i)
-                if (child.visibility != View.VISIBLE) continue
-                findViewAt(child, x, y)?.let { return it }
-            }
-
-            return if (isPointInsideView(x, y, parent) && parent.isClickable) parent else null
-        }
-
-        private fun isPointInsideView(x: Int, y: Int, view: View): Boolean {
-            val location = IntArray(2)
-            view.getLocationOnScreen(location)
-            return x >= location[0] && x <= location[0] + view.width &&
-                y >= location[1] && y <= location[1] + view.height
+            return null
         }
     }
 }
