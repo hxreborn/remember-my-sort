@@ -22,11 +22,11 @@ Users have [reported the issue since 2021](https://xdaforums.com/t/google-files-
 
 From the file picker's sort menu:
 
-- **Normal tap:** Updates the global sort for all folders.
-- **Long-press:** Saves a custom sort for the current folder only. Clear it by changing sort without long-press.
+- Normal tap: Updates the global sort for all folders.
+- Long-press: Saves a custom sort for the current folder only. Clear it by changing sort without long-press.
 
 > [!NOTE]
-> **Per-folder sorting quirks:**
+> Per-folder sorting quirks:
 > 1. Recent view can't have per-folder sort. Long-pressing there updates the global sort instead.
 > 2. Sort settings are stored per content provider. The same folder reached through different entry points may be treated separately (e.g., Downloads via quick access vs. via root storage).
 

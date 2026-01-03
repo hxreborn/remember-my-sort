@@ -13,7 +13,7 @@ object FolderContextHolder {
 
     fun set(ctx: FolderContext?) {
         threadLocal.set(ctx)
-        ctx?.also { lastLoadedContext = it }
+        if (ctx != null) lastLoadedContext = ctx
     }
 
     fun get(): FolderContext? = threadLocal.get() ?: lastLoadedContext
