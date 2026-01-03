@@ -48,8 +48,7 @@ class LongPressHooker : XposedInterface.Hooker {
                     if (method.name == "dispatchTouchEvent" && args?.isNotEmpty() == true) {
                         handleTouchEvent(args[0] as? MotionEvent)
                     }
-                    if (args == null) method.invoke(originalCallback)
-                    else method.invoke(originalCallback, *args)
+                    args?.let { method.invoke(originalCallback, *it) } ?: method.invoke(originalCallback)
                 }
 
                 window.callback = Proxy.newProxyInstance(

@@ -95,5 +95,4 @@ ktlint {
 
 dependencies {
     compileOnly(libs.libxposed.api)
-    implementation(libs.core.ktx)
 }

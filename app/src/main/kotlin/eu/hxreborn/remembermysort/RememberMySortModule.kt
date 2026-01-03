@@ -36,33 +36,25 @@ class RememberMySortModule(
 
     private fun hookSortCursor(classLoader: ClassLoader) {
         runCatching {
-            val sortModel = classLoader.loadClass(SORT_MODEL_CLASS)
-            val lookup = classLoader.loadClass(LOOKUP_CLASS)
+            val sortModel = classLoader.loadClass("com.android.documentsui.sorting.SortModel")
+            val lookup = classLoader.loadClass("com.android.documentsui.base.Lookup")
             hook(
-                sortModel.getDeclaredMethod(SORT_CURSOR_METHOD, Cursor::class.java, lookup),
+                sortModel.getDeclaredMethod("sortCursor", Cursor::class.java, lookup),
                 SortCursorHooker::class.java,
             )
-            log("Hooked $SORT_CURSOR_METHOD")
+            log("Hooked SortModel.sortCursor")
         }.onFailure { e ->
             log("Failed to hook SortModel.sortCursor", e)
         }
     }
 
     private fun hookSortListFragment(classLoader: ClassLoader) {
-        val sortFragmentClasses = listOf(
-            SORT_LIST_FRAGMENT_CLASS,
-            SORT_LIST_FRAGMENT_CLASS_GOOGLE,
-        )
-
-        for (className in sortFragmentClasses) {
+        for (className in SORT_FRAGMENT_CLASSES) {
             runCatching {
                 val clazz = classLoader.loadClass(className)
-
                 hook(clazz.getMethod("onStart"), LongPressHooker::class.java)
-                log("Hooked $className.onStart")
-
                 hook(clazz.getMethod("onStop"), SortDialogDismissHooker::class.java)
-                log("Hooked $className.onStop")
+                log("Hooked $className")
             }.onFailure { e ->
                 log("$className not found: ${e.message}")
             }
@@ -70,45 +62,28 @@ class RememberMySortModule(
     }
 
     private fun hookLoaders(classLoader: ClassLoader) {
-        val loaders =
-            listOf(
-                DIRECTORY_LOADER_CLASS to DirectoryLoaderHooker::class.java,
-                FOLDER_LOADER_CLASS to FolderLoaderHooker::class.java,
-                RECENTS_LOADER_CLASS to RecentsLoaderHooker::class.java,
-            )
-
-        for ((className, hooker) in loaders) {
-            hookLoader(classLoader, className, hooker)
-        }
-    }
-
-    private fun hookLoader(
-        classLoader: ClassLoader,
-        className: String,
-        hooker: Class<out XposedInterface.Hooker>,
-    ) {
-        runCatching {
-            val loaderClass = classLoader.loadClass(className)
-            val method = loaderClass.getDeclaredMethod(LOAD_IN_BACKGROUND_METHOD)
-            hook(method, hooker)
-            log("Hooked $className")
-        }.onFailure { _ ->
-            log("$className not found, skipping")
+        for ((className, hooker) in LOADERS) {
+            runCatching {
+                val loaderClass = classLoader.loadClass(className)
+                hook(loaderClass.getDeclaredMethod("loadInBackground"), hooker)
+                log("Hooked $className")
+            }.onFailure {
+                log("$className not found, skipping")
+            }
         }
     }
 
     companion object {
-        private const val SORT_MODEL_CLASS = "com.android.documentsui.sorting.SortModel"
-        private const val LOOKUP_CLASS = "com.android.documentsui.base.Lookup"
-        private const val SORT_CURSOR_METHOD = "sortCursor"
-        private const val DIRECTORY_LOADER_CLASS = "com.android.documentsui.DirectoryLoader"
-        private const val FOLDER_LOADER_CLASS = "com.android.documentsui.loaders.FolderLoader"
-        private const val RECENTS_LOADER_CLASS = "com.android.documentsui.RecentsLoader"
-        private const val LOAD_IN_BACKGROUND_METHOD = "loadInBackground"
-        private const val SORT_LIST_FRAGMENT_CLASS =
-            "com.android.documentsui.sorting.SortListFragment"
-        private const val SORT_LIST_FRAGMENT_CLASS_GOOGLE =
-            "com.google.android.documentsui.sorting.SortListFragment"
+        private val SORT_FRAGMENT_CLASSES = listOf(
+            "com.android.documentsui.sorting.SortListFragment",
+            "com.google.android.documentsui.sorting.SortListFragment",
+        )
+
+        private val LOADERS = listOf(
+            "com.android.documentsui.DirectoryLoader" to DirectoryLoaderHooker::class.java,
+            "com.android.documentsui.loaders.FolderLoader" to FolderLoaderHooker::class.java,
+            "com.android.documentsui.RecentsLoader" to RecentsLoaderHooker::class.java,
+        )
 
         fun log(
             msg: String,
