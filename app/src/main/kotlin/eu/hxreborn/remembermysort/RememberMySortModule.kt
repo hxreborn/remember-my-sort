@@ -26,7 +26,6 @@ class RememberMySortModule(
     override fun onPackageLoaded(param: PackageLoadedParam) {
         if (!param.isFirstPackage) return
 
-        // SortCursor must never fail (global sort), others are optional (per-folder)
         hookSortCursor(param.classLoader)
         hookSortListFragment(param.classLoader)
         hookLoaders(param.classLoader)
@@ -35,17 +34,18 @@ class RememberMySortModule(
     }
 
     private fun hookSortCursor(classLoader: ClassLoader) {
+        val className = "com.android.documentsui.sorting.SortModel"
         runCatching {
-            val sortModel = classLoader.loadClass("com.android.documentsui.sorting.SortModel")
+            val sortModel = classLoader.loadClass(className)
             val lookup = classLoader.loadClass("com.android.documentsui.base.Lookup")
             hook(
                 sortModel.getDeclaredMethod("sortCursor", Cursor::class.java, lookup),
                 SortCursorHooker::class.java,
             )
-            log("Hooked SortModel.sortCursor")
+            log("Hooked $className.sortCursor")
         }.onFailure { e ->
-            log("Failed to hook SortModel.sortCursor", e)
-        }
+            log("Failed to hook $className.sortCursor", e)
+        }.getOrThrow()
     }
 
     private fun hookSortListFragment(classLoader: ClassLoader) {
@@ -54,9 +54,9 @@ class RememberMySortModule(
                 val clazz = classLoader.loadClass(className)
                 hook(clazz.getMethod("onStart"), LongPressHooker::class.java)
                 hook(clazz.getMethod("onStop"), SortDialogDismissHooker::class.java)
-                log("Hooked $className")
-            }.onFailure { e ->
-                log("$className not found: ${e.message}")
+                log("Hooked $className.onStart/onStop")
+            }.onFailure {
+                log("$className not found, skipping")
             }
         }
     }
@@ -66,7 +66,7 @@ class RememberMySortModule(
             runCatching {
                 val loaderClass = classLoader.loadClass(className)
                 hook(loaderClass.getDeclaredMethod("loadInBackground"), hooker)
-                log("Hooked $className")
+                log("Hooked $className.loadInBackground")
             }.onFailure {
                 log("$className not found, skipping")
             }
@@ -79,7 +79,7 @@ class RememberMySortModule(
             "com.google.android.documentsui.sorting.SortListFragment",
         )
 
-        private val LOADERS = listOf(
+        private val LOADERS: List<Pair<String, Class<out XposedInterface.Hooker>>> = listOf(
             "com.android.documentsui.DirectoryLoader" to DirectoryLoaderHooker::class.java,
             "com.android.documentsui.loaders.FolderLoader" to FolderLoaderHooker::class.java,
             "com.android.documentsui.RecentsLoader" to RecentsLoaderHooker::class.java,
