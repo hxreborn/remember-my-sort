@@ -44,50 +44,37 @@ class SortCursorHooker : XposedInterface.Hooker {
 
             val isUserSpecified = fields.isUserSpecified.getBoolean(sortModel)
 
-            // Get current folder key from context (set by loader hooks)
             val folderKey = FolderContextHolder.get()?.toKey()
 
-            // Check if this is a per-folder save (from long-press in SortListFragment)
-            val isPerFolderSave = LongPressHooker.nextSortIsPerFolder
-            val perFolderTargetKey = LongPressHooker.perFolderTargetKey
-
-            if (isPerFolderSave && isUserSpecified && perFolderTargetKey != null) {
-                // Long-press triggered: save per-folder only, don't touch global
-                LongPressHooker.nextSortIsPerFolder = false
-                LongPressHooker.perFolderTargetKey = null
-
+            // User changed sort
+            if (isUserSpecified) {
                 val pref = getCurrentSortPref(sortModel, fields) ?: return
-                FolderSortPreferenceStore.persist(perFolderTargetKey, pref)
-
-                // Clear isUserSpecified to prevent subsequent global save
                 fields.isUserSpecified.setBoolean(sortModel, false)
 
-                val displayName = FolderContextHolder.get()?.displayName() ?: "folder"
-                ToastHelper.show("Sort saved for $displayName")
+                val isPerFolderSave = LongPressHooker.nextSortIsPerFolder
+                val perFolderTargetKey = LongPressHooker.perFolderTargetKey
 
-                // Update instance state
-                instanceState[sortModel] = AppliedState(perFolderTargetKey, pref)
-                log("SortCursor: saved per-folder sort for $displayName (pos=${pref.position}, dir=${pref.direction})")
-                return
-            }
+                // Long-press: save per-folder only
+                if (isPerFolderSave && perFolderTargetKey != null) {
+                    LongPressHooker.nextSortIsPerFolder = false
+                    LongPressHooker.perFolderTargetKey = null
 
-            if (isUserSpecified) {
-                // Normal tap: save to global + clear any per-folder override
-                val pref = getCurrentSortPref(sortModel, fields) ?: return
-                val state = instanceState[sortModel]
-                if (pref == state?.pref && state.key == GLOBAL_STATE_KEY) {
-                    // Already saved, just clear the flag
-                    fields.isUserSpecified.setBoolean(sortModel, false)
+                    FolderSortPreferenceStore.persist(perFolderTargetKey, pref)
+                    instanceState[sortModel] = AppliedState(perFolderTargetKey, pref)
+
+                    val displayName = FolderContextHolder.get()?.displayName() ?: "folder"
+                    ToastHelper.show("Sort saved for $displayName")
+                    log("SortCursor: saved per-folder sort for $displayName (pos=${pref.position}, dir=${pref.direction})")
                     return
                 }
 
-                // Clear per-folder override for current folder so it uses global
-                val hadOverride = folderKey?.let { FolderSortPreferenceStore.delete(it) } == true
+                // Normal tap: save global + clear folder override
+                val state = instanceState[sortModel]
+                if (pref == state?.pref && state.key == GLOBAL_STATE_KEY) return
 
+                val hadOverride = folderKey?.let { FolderSortPreferenceStore.delete(it) } == true
                 GlobalSortPreferenceStore.persist(pref)
                 instanceState[sortModel] = AppliedState(GLOBAL_STATE_KEY, pref)
-                // Clear flag to ensure next folder load applies saved sort
-                fields.isUserSpecified.setBoolean(sortModel, false)
 
                 val message = if (hadOverride) "Global sort saved (folder override cleared)" else "Global sort saved"
                 ToastHelper.show(message)
@@ -95,7 +82,7 @@ class SortCursorHooker : XposedInterface.Hooker {
                 return
             }
 
-            // Apply saved sort: per-folder first, then global
+            // Apply saved sort: per-folder first, then global fallback
             val pref = folderKey?.let { FolderSortPreferenceStore.loadIfExists(it) }
                 ?: GlobalSortPreferenceStore.load()
                 ?: return

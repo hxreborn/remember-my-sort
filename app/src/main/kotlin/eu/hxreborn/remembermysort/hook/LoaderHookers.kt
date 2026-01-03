@@ -13,7 +13,6 @@ import io.github.libxposed.api.annotations.BeforeInvocation
 import io.github.libxposed.api.annotations.XposedHooker
 import java.lang.reflect.Field
 
-// Hooks DirectoryLoader.loadInBackground to extract folder context
 @XposedHooker
 class DirectoryLoaderHooker : XposedInterface.Hooker {
     companion object {
@@ -65,7 +64,6 @@ class DirectoryLoaderHooker : XposedInterface.Hooker {
     }
 }
 
-// Hooks FolderLoader.loadInBackground to extract folder context
 @XposedHooker
 class FolderLoaderHooker : XposedInterface.Hooker {
     companion object {
@@ -127,14 +125,13 @@ class FolderLoaderHooker : XposedInterface.Hooker {
 private data class DirLoaderFields(val clazz: Class<*>, val mDoc: Field, val mRoot: Field)
 private data class FolderLoaderFields(val clazz: Class<*>, val mListedDir: Field, val mRoot: Field)
 
-// Hooks RecentsLoader.loadInBackground to clear stale folder context
-// Recent view doesn't have a folder, so we clear lastLoadedContext to prevent wrong per-folder saves
 @XposedHooker
 class RecentsLoaderHooker : XposedInterface.Hooker {
     companion object {
         @JvmStatic
         @BeforeInvocation
         fun beforeInvocation(@Suppress("UNUSED_PARAMETER") callback: BeforeHookCallback) {
+            // Recents has no folder identity, clear stale context to prevent wrong saves
             FolderContextHolder.clearLast()
         }
     }

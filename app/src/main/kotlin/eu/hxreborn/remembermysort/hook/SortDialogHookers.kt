@@ -17,7 +17,6 @@ import java.lang.ref.WeakReference
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
 
-// Hooks SortListFragment.onStart - intercepts touch events to detect long-press
 @XposedHooker
 class LongPressHooker : XposedInterface.Hooker {
     companion object {
