@@ -1,7 +1,12 @@
 package eu.hxreborn.remembermysort
 
 import android.database.Cursor
+import eu.hxreborn.remembermysort.hook.DirectoryLoaderHooker
+import eu.hxreborn.remembermysort.hook.FolderLoaderHooker
+import eu.hxreborn.remembermysort.hook.LongPressHooker
+import eu.hxreborn.remembermysort.hook.RecentsLoaderHooker
 import eu.hxreborn.remembermysort.hook.SortCursorHooker
+import eu.hxreborn.remembermysort.hook.SortDialogDismissHooker
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
@@ -21,23 +26,64 @@ class RememberMySortModule(
     override fun onPackageLoaded(param: PackageLoadedParam) {
         if (!param.isFirstPackage) return
 
+        hookSortCursor(param.classLoader)
+        hookSortListFragment(param.classLoader)
+        hookLoaders(param.classLoader)
+
+        log("Module initialized in ${param.packageName}")
+    }
+
+    private fun hookSortCursor(classLoader: ClassLoader) {
+        val className = "com.android.documentsui.sorting.SortModel"
         runCatching {
-            val sortModel = param.classLoader.loadClass(SORT_MODEL_CLASS)
-            val lookup = param.classLoader.loadClass(LOOKUP_CLASS)
+            val sortModel = classLoader.loadClass(className)
+            val lookup = classLoader.loadClass("com.android.documentsui.base.Lookup")
             hook(
-                sortModel.getDeclaredMethod(SORT_CURSOR_METHOD, Cursor::class.java, lookup),
+                sortModel.getDeclaredMethod("sortCursor", Cursor::class.java, lookup),
                 SortCursorHooker::class.java,
             )
-            log("Hooked $SORT_CURSOR_METHOD in ${param.packageName}")
+            log("Hooked $className.sortCursor")
         }.onFailure { e ->
-            log("Hook failed", e)
+            log("Failed to hook $className.sortCursor", e)
+        }.getOrThrow()
+    }
+
+    private fun hookSortListFragment(classLoader: ClassLoader) {
+        for (className in SORT_FRAGMENT_CLASSES) {
+            runCatching {
+                val clazz = classLoader.loadClass(className)
+                hook(clazz.getMethod("onStart"), LongPressHooker::class.java)
+                hook(clazz.getMethod("onStop"), SortDialogDismissHooker::class.java)
+                log("Hooked $className.onStart/onStop")
+            }.onFailure {
+                log("$className not found, skipping")
+            }
+        }
+    }
+
+    private fun hookLoaders(classLoader: ClassLoader) {
+        for ((className, hooker) in LOADERS) {
+            runCatching {
+                val loaderClass = classLoader.loadClass(className)
+                hook(loaderClass.getDeclaredMethod("loadInBackground"), hooker)
+                log("Hooked $className.loadInBackground")
+            }.onFailure {
+                log("$className not found, skipping")
+            }
         }
     }
 
     companion object {
-        private const val SORT_MODEL_CLASS = "com.android.documentsui.sorting.SortModel"
-        private const val LOOKUP_CLASS = "com.android.documentsui.base.Lookup"
-        private const val SORT_CURSOR_METHOD = "sortCursor"
+        private val SORT_FRAGMENT_CLASSES = listOf(
+            "com.android.documentsui.sorting.SortListFragment",
+            "com.google.android.documentsui.sorting.SortListFragment",
+        )
+
+        private val LOADERS: List<Pair<String, Class<out XposedInterface.Hooker>>> = listOf(
+            "com.android.documentsui.DirectoryLoader" to DirectoryLoaderHooker::class.java,
+            "com.android.documentsui.loaders.FolderLoader" to FolderLoaderHooker::class.java,
+            "com.android.documentsui.RecentsLoader" to RecentsLoaderHooker::class.java,
+        )
 
         fun log(
             msg: String,

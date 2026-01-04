@@ -18,35 +18,45 @@ Starting with Android 11's [scoped storage](https://developer.android.com/about/
 
 Users have [reported the issue since 2021](https://xdaforums.com/t/google-files-default-sort.4309799/) with no fix from Google.
 
-## How it Works
+## Usage
 
-Hooks into DocumentsUI sort logic. Manual sort changes are persisted to storage and restored on subsequent picker launches.
+From the file picker's sort menu:
+
+- Normal tap: Updates the global sort for all folders.
+- Long-press: Saves a custom sort for the current folder only. Clear it by changing sort without long-press.
+
+> [!NOTE]
+> Per-folder sorting quirks:
+> 1. Recent view can't have per-folder sort. Long-pressing there updates the global sort instead.
+> 2. Sort settings are stored per content provider. The same folder reached through different entry points may be treated separately (e.g., Downloads via quick access vs. via root storage).
 
 ## Requirements
 
-- LSPosed framework (API 100)
-- Android 11+ (API 30+)
-
-## Compatibility
-
-Works on AOSP-based ROMs and Pixel devices. OEM-modified ROMs are untested.
+Requires [LSPosed](https://github.com/JingMatrix/LSPosed) and Android 11+. Works on Pixel and AOSP-based ROMs. OEM-modified ROMs are untested.
 
 ## Installation
 
-1. Enable module in LSPosed Manager
-2. Add DocumentsUI to module scope:
-   - Google/Pixel: `com.google.android.documentsui`
+1. Install APK and enable in LSPosed Manager
+2. Add recommended DocumentsUI packages to scope
+   - Pixel: `com.google.android.documentsui`
    - AOSP: `com.android.documentsui`
 3. Force stop DocumentsUI
-4. Open a file from any app to trigger DocumentsUI
 
 ## Build
 
-```bash
-./gradlew assembleDebug
-```
+1. Install JDK 21, Android SDK
 
-Requires JDK 21 and Gradle 8.13.
+2. Configure SDK path in `local.properties`
+
+   ```properties
+   sdk.dir=/path/to/android/sdk
+   ```
+
+3. Build APK
+
+   ```bash
+   ./gradlew assembleRelease
+   ```
 
 ## License
 
