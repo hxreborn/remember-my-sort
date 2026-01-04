@@ -1,9 +1,16 @@
 <p>Android's file picker (DocumentsUI) resets sort order every time you navigate into a folder. This Xposed module persists your sort preference across directories and sessions.</p>
 
+<p><b>Features:</b></p>
+<ul>
+<li>Tap a sort option to set the global default</li>
+<li>Long-press a sort option to save per-folder preference</li>
+<li>Per-folder overrides take priority over global default</li>
+</ul>
+
 <p>Requires official LSPosed framework, Android 11+ and root access.</p>
 
 <p>Supported packages:</p>
 <ul>
-<li>com.google.android.documentsui (Google/Pixel)</li>
+<li>com.google.android.documentsui (Google Pixel)</li>
 <li>com.android.documentsui (AOSP)</li>
 </ul>

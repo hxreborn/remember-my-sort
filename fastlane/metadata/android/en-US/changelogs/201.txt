@@ -1,0 +1,4 @@
+Per-folder sort preferences
+- Long-press sort option to save per-folder preference
+- Regular tap sets global default and clears folder overrides
+- Recent view uses global sort only
