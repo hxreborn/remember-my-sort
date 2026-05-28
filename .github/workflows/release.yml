@@ -17,6 +17,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Derive mirror tag
+        id: mirror_tag
+        run: |
+          code=$(grep '^version\.code=' gradle.properties 2>/dev/null | cut -d= -f2)
+          name=$(grep '^version\.name=' gradle.properties 2>/dev/null | cut -d= -f2)
+          if [ -z "$code" ]; then
+            code=$(grep -E '^\s+versionCode\s*=' app/build.gradle.kts | grep -oE '[0-9]+' | head -1)
+          fi
+          if [ -z "$name" ]; then
+            name=$(grep -E '^\s+versionName\s*=' app/build.gradle.kts | grep -oE '"[^"]+"' | tr -d '"' | head -1)
+          fi
+          echo "mirror_tag=${code}-${name}" >> "$GITHUB_OUTPUT"
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -57,6 +70,17 @@ jobs:
           files: app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Mirror to Xposed-Modules-Repo
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: Xposed-Modules-Repo/eu.hxreborn.remembermysort
+          token: ${{ secrets.XPOSED_REPO_PAT }}
+          tag_name: ${{ steps.mirror_tag.outputs.mirror_tag }}
+          body: ${{ steps.changelog.outputs.changes || format('Release {0}', github.ref_name) }}
+          files: app/build/outputs/apk/release/app-release.apk
+          fail_on_unmatched_files: true
+          make_latest: true
 
       - name: Clean up keystore
         if: always()
