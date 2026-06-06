@@ -18,7 +18,11 @@ internal lateinit var module: RememberMySortModule
 class RememberMySortModule : XposedModule() {
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         module = this
-        log(Log.INFO, TAG, "loaded version=${BuildConfig.VERSION_NAME} process=${param.processName}")
+        log(
+            Log.INFO,
+            TAG,
+            "loaded version=${BuildConfig.VERSION_NAME} process=${param.processName}",
+        )
     }
 
     override fun onPackageReady(param: PackageReadyParam) {
