@@ -31,7 +31,7 @@ object SortCursorHooker : XposedInterface.Hooker {
 
         val fields =
             runCatching { getSortModelFields(sortModel.javaClass) }
-                .onFailure { e -> log("SortCursor: reflection failed", e) }
+                .onFailure { e -> log("reflect failed target=sort-model", e) }
                 .getOrNull() ?: return chain.proceed()
 
         val isUserSpecified = fields.isUserSpecified.getBoolean(sortModel)
@@ -54,7 +54,7 @@ object SortCursorHooker : XposedInterface.Hooker {
                 val displayName = FolderContextHolder.get()?.displayName() ?: "folder"
                 ToastHelper.show("Sort saved for $displayName")
                 log(
-                    "SortCursor: saved per-folder sort for $displayName (pos=${pref.position}, dir=${pref.direction})",
+                    "saved per-folder-sort folder=$displayName pos=${pref.position} dir=${pref.direction}",
                 )
                 return chain.proceed()
             }
@@ -73,7 +73,7 @@ object SortCursorHooker : XposedInterface.Hooker {
                     "Global sort saved"
                 }
             ToastHelper.show(message)
-            log("SortCursor: saved global sort (pos=${pref.position}, dir=${pref.direction})")
+            log("saved global-sort pos=${pref.position} dir=${pref.direction}")
             return chain.proceed()
         }
 
@@ -117,7 +117,7 @@ object SortCursorHooker : XposedInterface.Hooker {
             runCatching { getDimensionFields(targetDim.javaClass) }.getOrNull() ?: return
         dimFields.sortDirection.setInt(targetDim, pref.direction)
         fields.sortedDimension.set(sortModel, targetDim)
-        log("SortCursor: applied sort (pos=${pref.position}, dir=${pref.direction})")
+        log("applied sort pos=${pref.position} dir=${pref.direction}")
     }
 
     private fun getSortModelFields(clazz: Class<*>): ReflectedSortModel =

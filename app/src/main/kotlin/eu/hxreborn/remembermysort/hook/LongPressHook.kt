@@ -61,7 +61,7 @@ object LongPressHook {
                 ) as Window.Callback
             dialogFolderKey = FolderContextHolder.get()?.toKey()
         }.onFailure {
-            log("LongPressHook: failed to wrap callback", it)
+            log("wrap callback failed target=long-press", it)
         }
     }
 

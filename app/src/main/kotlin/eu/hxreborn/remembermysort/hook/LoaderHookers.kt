@@ -18,7 +18,7 @@ object DirectoryLoaderHooker : XposedInterface.Hooker {
         if (loader != null) {
             runCatching {
                 extractContext(loader)?.let { FolderContextHolder.set(it) }
-            }.onFailure { e -> log("DirectoryLoader: failed to extract context", e) }
+            }.onFailure { e -> log("extract context failed loader=DirectoryLoader", e) }
         }
         return try {
             chain.proceed()
@@ -66,7 +66,7 @@ object FolderLoaderHooker : XposedInterface.Hooker {
         if (loader != null) {
             runCatching {
                 extractContext(loader)?.let { FolderContextHolder.set(it) }
-            }.onFailure { e -> log("FolderLoader: failed to extract context", e) }
+            }.onFailure { e -> log("extract context failed loader=FolderLoader", e) }
         }
         return try {
             chain.proceed()

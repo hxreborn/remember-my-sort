@@ -87,6 +87,6 @@ internal object FolderSortPreferenceStore {
     private fun evictIfNeeded() =
         (cache.size - MAX_ENTRIES).takeIf { it > 0 }?.let { excess ->
             cache.keys.take(excess).forEach { cache.remove(it) }
-            log("FolderSort: evicted $excess oldest entries")
+            log("evicted folder-sort count=$excess")
         }
 }

@@ -18,7 +18,7 @@ internal lateinit var module: RememberMySortModule
 class RememberMySortModule : XposedModule() {
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         module = this
-        log(Log.INFO, TAG, "v${BuildConfig.VERSION_NAME} loaded in ${param.processName}")
+        log(Log.INFO, TAG, "loaded version=${BuildConfig.VERSION_NAME} process=${param.processName}")
     }
 
     override fun onPackageReady(param: PackageReadyParam) {
@@ -28,7 +28,7 @@ class RememberMySortModule : XposedModule() {
         hookSortListFragment(param.classLoader)
         hookLoaders(param.classLoader)
 
-        log(Log.INFO, TAG, "Module initialized in ${param.packageName}")
+        log(Log.INFO, TAG, "initialized pkg=${param.packageName}")
     }
 
     private fun hookSortCursor(classLoader: ClassLoader) {
@@ -38,9 +38,9 @@ class RememberMySortModule : XposedModule() {
             val lookup = classLoader.loadClass("com.android.documentsui.base.Lookup")
             hook(sortModel.getDeclaredMethod("sortCursor", Cursor::class.java, lookup))
                 .intercept(SortCursorHooker)
-            log("Hooked $className.sortCursor")
+            log("hooked sort-cursor class=$className")
         }.onFailure { e ->
-            log("Failed to hook $className.sortCursor", e)
+            log("hook failed target=sort-cursor class=$className", e)
         }.getOrThrow()
     }
 
@@ -58,9 +58,9 @@ class RememberMySortModule : XposedModule() {
                     LongPressHook.onSortListStopped()
                     result
                 }
-                log("Hooked $className.onStart/onStop")
+                log("hooked sort-list class=$className")
             }.onFailure {
-                log("$className not found, skipping")
+                log("skip class=$className reason=not-found")
             }
         }
     }
@@ -70,9 +70,9 @@ class RememberMySortModule : XposedModule() {
             runCatching {
                 val loaderClass = classLoader.loadClass(className)
                 hook(loaderClass.getDeclaredMethod("loadInBackground")).intercept(hooker)
-                log("Hooked $className.loadInBackground")
+                log("hooked loader class=$className")
             }.onFailure {
-                log("$className not found, skipping")
+                log("skip class=$className reason=not-found")
             }
         }
     }
