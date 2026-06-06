@@ -4,7 +4,7 @@ import android.database.Cursor
 import android.util.Log
 import eu.hxreborn.remembermysort.hook.DirectoryLoaderHooker
 import eu.hxreborn.remembermysort.hook.FolderLoaderHooker
-import eu.hxreborn.remembermysort.hook.LongPressHooker
+import eu.hxreborn.remembermysort.hook.LongPressHook
 import eu.hxreborn.remembermysort.hook.RecentsLoaderHooker
 import eu.hxreborn.remembermysort.hook.SortCursorHooker
 import io.github.libxposed.api.XposedInterface
@@ -50,12 +50,12 @@ class RememberMySortModule : XposedModule() {
                 val clazz = classLoader.loadClass(className)
                 hook(clazz.getMethod("onStart")).intercept { chain ->
                     val result = chain.proceed()
-                    LongPressHooker.handleOnStart(chain.thisObject)
+                    LongPressHook.onSortListStarted(chain.thisObject)
                     result
                 }
                 hook(clazz.getMethod("onStop")).intercept { chain ->
                     val result = chain.proceed()
-                    LongPressHooker.clearDialogState()
+                    LongPressHook.onSortListStopped()
                     result
                 }
                 log("Hooked $className.onStart/onStop")

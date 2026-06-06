@@ -13,7 +13,7 @@ import java.lang.ref.WeakReference
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
 
-object LongPressHooker {
+object LongPressHook {
     @Volatile var nextSortIsPerFolder = false
 
     @Volatile var perFolderTargetKey: String? = null
@@ -27,7 +27,7 @@ object LongPressHooker {
     private var pressedView: WeakReference<View>? = null
     private var currentDecorView: WeakReference<View>? = null
 
-    fun handleOnStart(fragment: Any?) {
+    fun onSortListStarted(fragment: Any?) {
         fragment ?: return
 
         runCatching {
@@ -61,11 +61,11 @@ object LongPressHooker {
                 ) as Window.Callback
             dialogFolderKey = FolderContextHolder.get()?.toKey()
         }.onFailure {
-            log("LongPressHooker: failed to wrap callback", it)
+            log("LongPressHook: failed to wrap callback", it)
         }
     }
 
-    fun clearDialogState() {
+    fun onSortListStopped() {
         dialogFolderKey = null
         longPressConsumed = false
         cancelScheduledLongPress()
