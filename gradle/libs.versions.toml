@@ -1,5 +1,5 @@
 [versions]
-agp = "9.1.0"
+agp = "9.3.1"
 kotlin = "2.3.20"
 xposed-api = "101.0.0"
 
