@@ -1,31 +1,31 @@
 package eu.hxreborn.remembermysort.hook
 
-import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import eu.hxreborn.remembermysort.model.BasicRootFields
 import eu.hxreborn.remembermysort.model.DocFields
 import eu.hxreborn.remembermysort.model.ExtendedRootFields
+import eu.hxreborn.remembermysort.util.Logger.log
 import eu.hxreborn.remembermysort.util.accessibleField
-import io.github.libxposed.api.XposedInterface
 import java.lang.reflect.Field
 
-object DirectoryLoaderHooker : XposedInterface.Hooker {
+internal interface LoaderHook {
+    fun onLoadStart(loader: Any?)
+
+    fun onLoadFinish()
+}
+
+internal object DirectoryLoaderHook : LoaderHook {
     private var loaderFields: DirLoaderFields? = null
     private var docFields: DocFields? = null
     private var rootFields: BasicRootFields? = null
 
-    override fun intercept(chain: XposedInterface.Chain): Any? {
-        val loader = chain.thisObject
-        if (loader != null) {
-            runCatching {
-                extractContext(loader)?.let { FolderContextHolder.set(it) }
-            }.onFailure { e -> log("extract context failed loader=DirectoryLoader", e) }
-        }
-        return try {
-            chain.proceed()
-        } finally {
-            FolderContextHolder.clear()
-        }
+    override fun onLoadStart(loader: Any?) {
+        loader ?: return
+        runCatching {
+            extractContext(loader)?.let { FolderContextHolder.set(it) }
+        }.onFailure { e -> log("extract context failed loader=DirectoryLoader", e) }
     }
+
+    override fun onLoadFinish() = FolderContextHolder.clear()
 
     private fun extractContext(loader: Any): FolderContext? {
         val fields = getLoaderFields(loader.javaClass)
@@ -56,24 +56,19 @@ object DirectoryLoaderHooker : XposedInterface.Hooker {
                 .also { rootFields = it }
 }
 
-object FolderLoaderHooker : XposedInterface.Hooker {
+internal object FolderLoaderHook : LoaderHook {
     private var loaderFields: FolderLoaderFields? = null
     private var docFields: DocFields? = null
     private var rootFields: ExtendedRootFields? = null
 
-    override fun intercept(chain: XposedInterface.Chain): Any? {
-        val loader = chain.thisObject
-        if (loader != null) {
-            runCatching {
-                extractContext(loader)?.let { FolderContextHolder.set(it) }
-            }.onFailure { e -> log("extract context failed loader=FolderLoader", e) }
-        }
-        return try {
-            chain.proceed()
-        } finally {
-            FolderContextHolder.clear()
-        }
+    override fun onLoadStart(loader: Any?) {
+        loader ?: return
+        runCatching {
+            extractContext(loader)?.let { FolderContextHolder.set(it) }
+        }.onFailure { e -> log("extract context failed loader=FolderLoader", e) }
     }
+
+    override fun onLoadFinish() = FolderContextHolder.clear()
 
     private fun extractContext(loader: Any): FolderContext? {
         val fields = getLoaderFields(loader.javaClass)
@@ -126,9 +121,8 @@ private data class FolderLoaderFields(
     val mRoot: Field,
 )
 
-object RecentsLoaderHooker : XposedInterface.Hooker {
-    override fun intercept(chain: XposedInterface.Chain): Any? {
-        FolderContextHolder.clearLast()
-        return chain.proceed()
-    }
+internal object RecentsLoaderHook : LoaderHook {
+    override fun onLoadStart(loader: Any?) = FolderContextHolder.clearLast()
+
+    override fun onLoadFinish() = Unit
 }

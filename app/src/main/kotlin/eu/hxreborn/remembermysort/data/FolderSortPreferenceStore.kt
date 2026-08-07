@@ -1,8 +1,8 @@
 package eu.hxreborn.remembermysort.data
 
-import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import eu.hxreborn.remembermysort.model.SortPreference
 import eu.hxreborn.remembermysort.util.ContextHelper
+import eu.hxreborn.remembermysort.util.Logger.log
 import org.json.JSONObject
 import java.io.File
 

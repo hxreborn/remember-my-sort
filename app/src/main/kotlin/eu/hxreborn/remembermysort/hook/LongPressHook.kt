@@ -8,7 +8,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.Window
-import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
+import eu.hxreborn.remembermysort.util.Logger.log
 import java.lang.ref.WeakReference
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy

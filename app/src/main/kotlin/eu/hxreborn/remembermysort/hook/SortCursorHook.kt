@@ -1,19 +1,18 @@
 package eu.hxreborn.remembermysort.hook
 
 import android.util.SparseArray
-import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import eu.hxreborn.remembermysort.data.FolderSortPreferenceStore
 import eu.hxreborn.remembermysort.data.GlobalSortPreferenceStore
 import eu.hxreborn.remembermysort.model.ReflectedDimension
 import eu.hxreborn.remembermysort.model.ReflectedSortModel
 import eu.hxreborn.remembermysort.model.SortPreference
+import eu.hxreborn.remembermysort.util.Logger.log
 import eu.hxreborn.remembermysort.util.ToastHelper
 import eu.hxreborn.remembermysort.util.accessibleField
-import io.github.libxposed.api.XposedInterface
 import java.util.Collections
 import java.util.WeakHashMap
 
-object SortCursorHooker : XposedInterface.Hooker {
+internal object SortCursorHook {
     private var sortModelFields: ReflectedSortModel? = null
     private var dimensionFields: ReflectedDimension? = null
 
@@ -26,19 +25,19 @@ object SortCursorHooker : XposedInterface.Hooker {
         val pref: SortPreference,
     )
 
-    override fun intercept(chain: XposedInterface.Chain): Any? {
-        val sortModel = chain.thisObject ?: return chain.proceed()
+    fun onSortCursor(sortModel: Any?) {
+        sortModel ?: return
 
         val fields =
             runCatching { getSortModelFields(sortModel.javaClass) }
                 .onFailure { e -> log("reflect failed target=sort-model", e) }
-                .getOrNull() ?: return chain.proceed()
+                .getOrNull() ?: return
 
         val isUserSpecified = fields.isUserSpecified.getBoolean(sortModel)
         val folderKey = FolderContextHolder.get()?.toKey()
 
         if (isUserSpecified) {
-            val pref = getCurrentSortPref(sortModel, fields) ?: return chain.proceed()
+            val pref = getCurrentSortPref(sortModel, fields) ?: return
             fields.isUserSpecified.setBoolean(sortModel, false)
 
             val isPerFolderSave = LongPressHook.nextSortIsPerFolder
@@ -56,11 +55,11 @@ object SortCursorHooker : XposedInterface.Hooker {
                 log(
                     "saved per-folder-sort folder=$displayName pos=${pref.position} dir=${pref.direction}",
                 )
-                return chain.proceed()
+                return
             }
 
             val state = instanceState[sortModel]
-            if (pref == state?.pref && state.key == GLOBAL_STATE_KEY) return chain.proceed()
+            if (pref == state?.pref && state.key == GLOBAL_STATE_KEY) return
 
             val hadOverride = folderKey?.let { FolderSortPreferenceStore.delete(it) } == true
             GlobalSortPreferenceStore.persist(pref)
@@ -74,20 +73,17 @@ object SortCursorHooker : XposedInterface.Hooker {
                 }
             ToastHelper.show(message)
             log("saved global-sort pos=${pref.position} dir=${pref.direction}")
-            return chain.proceed()
+            return
         }
 
         val pref =
             folderKey?.let { FolderSortPreferenceStore.loadIfExists(it) }
                 ?: GlobalSortPreferenceStore.load()
-                ?: return chain.proceed()
+                ?: return
 
-        val dimensions =
-            fields.dimensions.get(sortModel) as? SparseArray<*> ?: return chain.proceed()
+        val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return
         applyPrefToDimensions(sortModel, fields, dimensions, pref)
         instanceState[sortModel] = AppliedState(folderKey ?: GLOBAL_STATE_KEY, pref)
-
-        return chain.proceed()
     }
 
     private fun getCurrentSortPref(

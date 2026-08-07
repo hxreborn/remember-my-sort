@@ -8,6 +8,12 @@
     public void onSystemServerStarting(...);
 }
 
+-keep public class eu.hxreborn.remembermysort.LegacyXposedEntry {
+    public <init>();
+    public void handleLoadPackage(...);
+}
+-dontwarn de.robv.android.xposed.**
+
 # Kotlin intrinsics optimization
 -assumenosideeffects class kotlin.jvm.internal.Intrinsics {
     public static void check*(...);
