@@ -2,6 +2,9 @@ version: 2
 
 updates:
   - package-ecosystem: "gradle"
+    ignore:
+      - dependency-name: "io.github.libxposed:*"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "ci(deps)"
     directory: "/"
