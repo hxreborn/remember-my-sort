@@ -1,7 +1,7 @@
 [versions]
 agp = "9.1.0"
 kotlin = "2.3.20"
-xposed-api = "101.0.0"
+xposed-api = "102.0.0"
 
 [libraries]
 libxposed-api = { group = "io.github.libxposed", name = "api", version.ref = "xposed-api" }
