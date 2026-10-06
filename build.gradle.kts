@@ -1,8 +1,15 @@
 import org.gradle.api.plugins.BasePlugin
 import org.gradle.api.tasks.Delete
 
+buildscript {
+    dependencies {
+        classpath(libs.kotlin.gradle.plugin)
+    }
+}
+
 plugins {
     base
+    alias(libs.plugins.agp.app) apply false
 }
 
 tasks.named<Delete>("clean") {
