@@ -7,7 +7,7 @@ import java.io.File
 private const val PREF_FILENAME = "rms_pref"
 
 internal object GlobalSortPreferenceStore {
-    private val context by lazy { ContextHelper.applicationContext }
+    private val file get() = File(ContextHelper.applicationContext.filesDir, PREF_FILENAME)
 
     @Volatile
     private var cached: SortPreference? = null
@@ -15,14 +15,13 @@ internal object GlobalSortPreferenceStore {
     @Volatile
     private var loaded = false
 
-    fun persist(pref: SortPreference): Boolean {
-        if (pref == cached) return false
-        return runCatching {
-            File(context.filesDir, PREF_FILENAME).writeText("${pref.position}:${pref.direction}")
+    fun persist(pref: SortPreference) {
+        if (pref == cached) return
+        runCatching {
+            file.writeText("${pref.position}:${pref.direction}")
             cached = pref
             loaded = true
-            true
-        }.getOrDefault(false)
+        }
     }
 
     fun load(): SortPreference? {
@@ -34,7 +33,7 @@ internal object GlobalSortPreferenceStore {
     }
 
     private fun readFromDisk(): SortPreference? =
-        File(context.filesDir, PREF_FILENAME)
+        file
             .takeIf { it.exists() }
             ?.runCatching {
                 readText()

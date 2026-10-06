@@ -10,7 +10,7 @@ private const val PREF_FILENAME = "rms_folder_prefs"
 private const val MAX_ENTRIES = 256
 
 internal object FolderSortPreferenceStore {
-    private val context by lazy { ContextHelper.applicationContext }
+    private val filesDir get() = ContextHelper.applicationContext.filesDir
     private val lock = Any()
 
     private val cache: LinkedHashMap<String, SortPreference> by lazy {
@@ -32,18 +32,15 @@ internal object FolderSortPreferenceStore {
     fun persist(
         folderKey: String,
         pref: SortPreference,
-    ): Boolean {
-        synchronized(lock) {
-            if (cache[folderKey] == pref) return false
-            cache[folderKey] = pref
-            evictIfNeeded()
-            writeToDiskLocked()
-        }
-        return true
+    ) = synchronized(lock) {
+        if (cache[folderKey] == pref) return
+        cache[folderKey] = pref
+        evictIfNeeded()
+        writeToDiskLocked()
     }
 
     private fun loadFromDisk(into: MutableMap<String, SortPreference>) {
-        File(context.filesDir, PREF_FILENAME)
+        File(filesDir, PREF_FILENAME)
             .takeIf { it.exists() }
             ?.runCatching {
                 readLines().filter { it.isNotBlank() }.forEach { line ->
@@ -62,8 +59,8 @@ internal object FolderSortPreferenceStore {
 
     private fun writeToDiskLocked() {
         runCatching {
-            val tempFile = File(context.filesDir, "$PREF_FILENAME.tmp")
-            val targetFile = File(context.filesDir, PREF_FILENAME)
+            val tempFile = File(filesDir, "$PREF_FILENAME.tmp")
+            val targetFile = File(filesDir, PREF_FILENAME)
 
             tempFile.bufferedWriter().use { writer ->
                 cache.forEach { (key, pref) ->
