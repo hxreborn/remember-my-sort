@@ -17,6 +17,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check release secrets
+        env:
+          XPOSED_REPO_PAT: ${{ secrets.XPOSED_REPO_PAT }}
+          RELEASE_KEYSTORE: ${{ secrets.RELEASE_KEYSTORE }}
+        run: |
+          for name in XPOSED_REPO_PAT RELEASE_KEYSTORE; do
+            if [ -z "${!name}" ]; then
+              echo "::error::secret $name is not set"
+              exit 1
+            fi
+          done
+
       - name: Derive mirror tag
         id: mirror_tag
         run: |
