@@ -1,5 +1,6 @@
 package eu.hxreborn.remembermysort.hook
 
+import android.os.Bundle
 import eu.hxreborn.remembermysort.model.DocFields
 import eu.hxreborn.remembermysort.model.ExtendedRootFields
 import eu.hxreborn.remembermysort.model.RootFields
@@ -22,6 +23,28 @@ object FolderContextHolder {
 
     fun clearLast() {
         lastLoadedContext = null
+    }
+
+    fun saveLast(): Bundle? =
+        lastLoadedContext?.let {
+            Bundle().apply {
+                putInt("userId", it.userId)
+                putString("authority", it.authority)
+                putString("rootId", it.rootId)
+                putString("documentId", it.documentId)
+            }
+        }
+
+    fun restoreLast(state: Bundle?) {
+        lastLoadedContext =
+            state?.let {
+                FolderContext(
+                    userId = it.getInt("userId"),
+                    authority = it.getString("authority", ""),
+                    rootId = it.getString("rootId", ""),
+                    documentId = it.getString("documentId", ""),
+                )
+            }
     }
 }
 

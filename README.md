@@ -43,6 +43,8 @@ Requires an Xposed framework with modern API 101 or newer and Android 11+. Works
    - AOSP: `com.android.documentsui`
 3. Force stop DocumentsUI
 
+On an API 102 framework, later module updates apply to a running DocumentsUI without another force stop.
+
 ## Build
 
 1. Install JDK 21, Android SDK

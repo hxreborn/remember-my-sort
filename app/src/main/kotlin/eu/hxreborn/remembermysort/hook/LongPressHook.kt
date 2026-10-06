@@ -12,6 +12,8 @@ import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import java.lang.ref.WeakReference
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 object LongPressHook {
     @Volatile var nextSortIsPerFolder = false
@@ -26,6 +28,7 @@ object LongPressHook {
     private var pendingLongPress: Runnable? = null
     private var pressedView: WeakReference<View>? = null
     private var currentDecorView: WeakReference<View>? = null
+    private var restoreWindowCallback: (() -> Unit)? = null
 
     fun onSortListStarted(fragment: Any?) {
         fragment ?: return
@@ -53,12 +56,16 @@ object LongPressHook {
                     }
                 }
 
-            window.callback =
+            val proxy =
                 Proxy.newProxyInstance(
                     Window.Callback::class.java.classLoader,
                     arrayOf(Window.Callback::class.java),
                     handler,
                 ) as Window.Callback
+            window.callback = proxy
+            restoreWindowCallback = {
+                if (window.callback === proxy) window.callback = originalCallback
+            }
             dialogFolderKey = FolderContextHolder.get()?.toKey()
         }.onFailure {
             log("wrap callback failed target=long-press", it)
@@ -71,6 +78,20 @@ object LongPressHook {
         cancelScheduledLongPress()
         pressedView = null
         currentDecorView = null
+        restoreWindowCallback?.invoke()
+        restoreWindowCallback = null
+    }
+
+    fun release() {
+        if (Looper.myLooper() == Looper.getMainLooper()) return onSortListStopped()
+        val done = CountDownLatch(1)
+        mainHandler.post {
+            onSortListStopped()
+            done.countDown()
+        }
+        if (!done.await(RELEASE_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            log("release timed out target=long-press")
+        }
     }
 
     private fun handleTouchEvent(event: MotionEvent?) {
@@ -144,4 +165,6 @@ object LongPressHook {
         }
         return null
     }
+
+    private const val RELEASE_TIMEOUT_MS = 1000L
 }

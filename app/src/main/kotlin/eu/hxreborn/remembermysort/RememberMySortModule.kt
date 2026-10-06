@@ -1,14 +1,18 @@
 package eu.hxreborn.remembermysort
 
 import android.database.Cursor
+import android.os.Bundle
 import android.util.Log
 import eu.hxreborn.remembermysort.hook.DirectoryLoaderHooker
+import eu.hxreborn.remembermysort.hook.FolderContextHolder
 import eu.hxreborn.remembermysort.hook.FolderLoaderHooker
 import eu.hxreborn.remembermysort.hook.LongPressHook
 import eu.hxreborn.remembermysort.hook.RecentsLoaderHooker
 import eu.hxreborn.remembermysort.hook.SortCursorHooker
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
+import io.github.libxposed.api.XposedModuleInterface.HotReloadedParam
+import io.github.libxposed.api.XposedModuleInterface.HotReloadingParam
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 
@@ -16,6 +20,8 @@ import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 internal lateinit var module: RememberMySortModule
 
 class RememberMySortModule : XposedModule() {
+    private var hostClassLoader: ClassLoader? = null
+
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         module = this
         log(
@@ -28,11 +34,35 @@ class RememberMySortModule : XposedModule() {
     override fun onPackageReady(param: PackageReadyParam) {
         if (!param.isFirstPackage) return
 
-        hookSortCursor(param.classLoader)
-        hookSortListFragment(param.classLoader)
-        hookLoaders(param.classLoader)
+        hostClassLoader = param.classLoader
+        installHooks(param.classLoader)
 
         log(Log.INFO, TAG, "initialized pkg=${param.packageName}")
+    }
+
+    override fun onHotReloading(param: HotReloadingParam): Boolean {
+        LongPressHook.release()
+        param.setSavedInstanceState(arrayOf(hostClassLoader, FolderContextHolder.saveLast()))
+        return true
+    }
+
+    override fun onHotReloaded(param: HotReloadedParam) {
+        module = this
+        param.oldHookHandles.forEach { it.unhook() }
+
+        val state = param.savedInstanceState as? Array<*>
+        val classLoader = state?.getOrNull(0) as? ClassLoader ?: return
+        hostClassLoader = classLoader
+        FolderContextHolder.restoreLast(state.getOrNull(1) as? Bundle)
+        installHooks(classLoader)
+
+        log("reloaded version=${BuildConfig.VERSION_NAME} process=${param.processName}")
+    }
+
+    private fun installHooks(classLoader: ClassLoader) {
+        hookSortCursor(classLoader)
+        hookSortListFragment(classLoader)
+        hookLoaders(classLoader)
     }
 
     private fun hookSortCursor(classLoader: ClassLoader) {
