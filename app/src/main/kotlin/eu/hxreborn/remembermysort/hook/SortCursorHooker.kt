@@ -18,74 +18,78 @@ object SortCursorHooker : XposedInterface.Hooker {
     private var sortModelFields: ReflectedSortModel? = null
     private var dimensionFields: ReflectedDimension? = null
 
-    private const val GLOBAL_STATE_KEY = "::GLOBAL::"
-
-    private val instanceState = Collections.synchronizedMap(WeakHashMap<Any, AppliedState>())
-
-    private data class AppliedState(
-        val key: String,
-        val pref: SortPreference,
-    )
+    private val lastGlobalSort = Collections.synchronizedMap(WeakHashMap<Any, SortPreference>())
 
     override fun intercept(chain: XposedInterface.Chain): Any? {
-        val sortModel = chain.thisObject ?: return chain.proceed()
+        chain.thisObject?.let(::syncSort)
+        return chain.proceed()
+    }
 
+    private fun syncSort(sortModel: Any) {
         val fields =
             runCatching { getSortModelFields(sortModel.javaClass) }
                 .onFailure { e -> log("reflect failed target=sort-model", e) }
-                .getOrNull() ?: return chain.proceed()
+                .getOrNull() ?: return
+        val folder = FolderContextHolder.get()
 
-        val isUserSpecified = fields.isUserSpecified.getBoolean(sortModel)
-        val folderKey = FolderContextHolder.get()?.toKey()
+        if (fields.isUserSpecified.getBoolean(sortModel)) {
+            saveUserSort(sortModel, fields, folder)
+        } else {
+            restoreSort(sortModel, fields, folder?.toKey())
+        }
+    }
 
-        if (isUserSpecified) {
-            val pref = getCurrentSortPref(sortModel, fields) ?: return chain.proceed()
-            fields.isUserSpecified.setBoolean(sortModel, false)
+    private fun saveUserSort(
+        sortModel: Any,
+        fields: ReflectedSortModel,
+        folder: FolderContext?,
+    ) {
+        val pref = getCurrentSortPref(sortModel, fields) ?: return
+        fields.isUserSpecified.setBoolean(sortModel, false)
 
-            val perFolderTargetKey = LongPressHook.perFolderTargetKey
-            if (perFolderTargetKey != null) {
-                LongPressHook.perFolderTargetKey = null
+        val perFolderTargetKey = LongPressHook.perFolderTargetKey
+        if (perFolderTargetKey != null) {
+            LongPressHook.perFolderTargetKey = null
+            FolderSortPreferenceStore.persist(perFolderTargetKey, pref)
+            lastGlobalSort.remove(sortModel)
 
-                FolderSortPreferenceStore.persist(perFolderTargetKey, pref)
-                instanceState[sortModel] = AppliedState(perFolderTargetKey, pref)
-
-                val displayName = FolderContextHolder.get()?.displayName() ?: "folder"
-                ToastHelper.show("Sort saved for $displayName")
-                log(
-                    "saved per-folder-sort folder=$displayName pos=${pref.position} dir=${pref.direction}",
-                )
-                return chain.proceed()
-            }
-
-            val state = instanceState[sortModel]
-            if (pref == state?.pref && state.key == GLOBAL_STATE_KEY) return chain.proceed()
-
-            val hadOverride = folderKey?.let { FolderSortPreferenceStore.delete(it) } == true
-            GlobalSortPreferenceStore.persist(pref)
-            instanceState[sortModel] = AppliedState(GLOBAL_STATE_KEY, pref)
-
-            val message =
-                if (hadOverride) {
-                    "Global sort saved (folder override cleared)"
-                } else {
-                    "Global sort saved"
-                }
-            ToastHelper.show(message)
-            log("saved global-sort pos=${pref.position} dir=${pref.direction}")
-            return chain.proceed()
+            val displayName = folder?.displayName() ?: "folder"
+            ToastHelper.show("Sort saved for $displayName")
+            log(
+                "saved per-folder-sort folder=$displayName pos=${pref.position} dir=${pref.direction}",
+            )
+            return
         }
 
+        if (lastGlobalSort[sortModel] == pref) return
+
+        val hadOverride = folder?.let { FolderSortPreferenceStore.delete(it.toKey()) } == true
+        GlobalSortPreferenceStore.persist(pref)
+        lastGlobalSort[sortModel] = pref
+
+        ToastHelper.show(
+            if (hadOverride) "Global sort saved (folder override cleared)" else "Global sort saved",
+        )
+        log("saved global-sort pos=${pref.position} dir=${pref.direction}")
+    }
+
+    private fun restoreSort(
+        sortModel: Any,
+        fields: ReflectedSortModel,
+        folderKey: String?,
+    ) {
         val pref =
             folderKey?.let { FolderSortPreferenceStore.loadIfExists(it) }
                 ?: GlobalSortPreferenceStore.load()
-                ?: return chain.proceed()
+                ?: return
+        val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return
 
-        val dimensions =
-            fields.dimensions.get(sortModel) as? SparseArray<*> ?: return chain.proceed()
         applyPrefToDimensions(sortModel, fields, dimensions, pref)
-        instanceState[sortModel] = AppliedState(folderKey ?: GLOBAL_STATE_KEY, pref)
-
-        return chain.proceed()
+        if (folderKey == null) {
+            lastGlobalSort[sortModel] = pref
+        } else {
+            lastGlobalSort.remove(sortModel)
+        }
     }
 
     private fun getCurrentSortPref(
