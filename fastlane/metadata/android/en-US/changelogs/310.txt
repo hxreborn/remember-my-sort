@@ -1,5 +1,6 @@
 - Apply module updates to a running file picker without a force stop on API 102 frameworks
 - Target libxposed API 102 while still supporting API 101 (thanks @mirsella)
+- Restore the original app icon by @0xRJDev
 - Upgrade build stack: Gradle 9.8.0, AGP 9.4.1, Kotlin 2.4.20
 
 Updating from 3.0.0 still needs one force stop of the file picker.
