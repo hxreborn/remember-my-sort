@@ -26,9 +26,7 @@ object LongPressHook {
     private var currentDecorView: WeakReference<View>? = null
     private var restoreWindowCallback: (() -> Unit)? = null
 
-    fun onSortListStarted(fragment: Any?) {
-        fragment ?: return
-
+    fun onSortListStarted(fragment: Any) {
         runCatching {
             val getDialog = fragment.javaClass.getMethod("getDialog")
             val dialog = getDialog.invoke(fragment) ?: return

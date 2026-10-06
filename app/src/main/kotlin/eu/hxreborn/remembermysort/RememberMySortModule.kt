@@ -79,14 +79,15 @@ class RememberMySortModule : XposedModule() {
             runCatching {
                 val clazz = classLoader.loadClass(className)
                 hook(clazz.getMethod("onStart")).intercept { chain ->
-                    val result = chain.proceed()
-                    LongPressHook.onSortListStarted(chain.thisObject)
-                    result
+                    chain.proceed().also {
+                        val fragment = chain.thisObject
+                        if (fragment?.javaClass === clazz) LongPressHook.onSortListStarted(fragment)
+                    }
                 }
                 hook(clazz.getMethod("onStop")).intercept { chain ->
-                    val result = chain.proceed()
-                    LongPressHook.onSortListStopped()
-                    result
+                    chain.proceed().also {
+                        if (chain.thisObject?.javaClass === clazz) LongPressHook.onSortListStopped()
+                    }
                 }
                 log("hooked sort-list class=$className")
             }.onFailure {
