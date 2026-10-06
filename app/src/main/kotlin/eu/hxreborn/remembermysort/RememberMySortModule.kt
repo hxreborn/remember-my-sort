@@ -15,8 +15,7 @@ import io.github.libxposed.api.XposedModuleInterface.HotReloadingParam
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
 import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam
 
-@PublishedApi
-internal lateinit var module: RememberMySortModule
+private lateinit var module: RememberMySortModule
 
 class RememberMySortModule : XposedModule() {
     private var hostClassLoader: ClassLoader? = null
@@ -108,7 +107,7 @@ class RememberMySortModule : XposedModule() {
     }
 
     companion object {
-        const val TAG = "RememberMySort"
+        private const val TAG = "RememberMySort"
 
         private val SORT_FRAGMENT_CLASSES =
             listOf(
