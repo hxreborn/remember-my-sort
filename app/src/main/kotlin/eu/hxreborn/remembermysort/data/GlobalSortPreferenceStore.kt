@@ -12,22 +12,33 @@ internal object GlobalSortPreferenceStore {
     @Volatile
     private var cached: SortPreference? = null
 
+    @Volatile
+    private var loaded = false
+
     fun persist(pref: SortPreference): Boolean {
         if (pref == cached) return false
         return runCatching {
             File(context.filesDir, PREF_FILENAME).writeText("${pref.position}:${pref.direction}")
             cached = pref
+            loaded = true
             true
         }.getOrDefault(false)
     }
 
-    fun load(): SortPreference? =
-        cached ?: File(context.filesDir, PREF_FILENAME)
+    fun load(): SortPreference? {
+        if (!loaded) {
+            cached = readFromDisk()
+            loaded = true
+        }
+        return cached
+    }
+
+    private fun readFromDisk(): SortPreference? =
+        File(context.filesDir, PREF_FILENAME)
             .takeIf { it.exists() }
             ?.runCatching {
                 readText()
                     .split(':')
                     .run { SortPreference(first().toInt(), last().trim().toInt()) }
             }?.getOrNull()
-            ?.also { cached = it }
 }
