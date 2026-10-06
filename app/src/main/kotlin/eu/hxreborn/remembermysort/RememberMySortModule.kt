@@ -24,11 +24,7 @@ class RememberMySortModule : XposedModule() {
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         module = this
-        log(
-            Log.INFO,
-            TAG,
-            "loaded version=${BuildConfig.VERSION_NAME} process=${param.processName}",
-        )
+        log("loaded version=${BuildConfig.VERSION_NAME} process=${param.processName}")
     }
 
     override fun onPackageReady(param: PackageReadyParam) {
@@ -37,7 +33,7 @@ class RememberMySortModule : XposedModule() {
         hostClassLoader = param.classLoader
         installHooks(param.classLoader)
 
-        log(Log.INFO, TAG, "initialized pkg=${param.packageName}")
+        log("initialized pkg=${param.packageName}")
     }
 
     override fun onHotReloading(param: HotReloadingParam): Boolean {
