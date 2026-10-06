@@ -70,7 +70,7 @@ object LongPressHook {
         restoreWindowCallback = null
     }
 
-    fun release() {
+    fun releaseOnMainThread() {
         if (Looper.myLooper() == Looper.getMainLooper()) return onSortListStopped()
         val done = CountDownLatch(1)
         mainHandler.post {

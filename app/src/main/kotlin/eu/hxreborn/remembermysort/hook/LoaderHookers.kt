@@ -7,7 +7,7 @@ import eu.hxreborn.remembermysort.model.RootFields
 import eu.hxreborn.remembermysort.util.accessibleField
 import io.github.libxposed.api.XposedInterface
 
-class FolderLoaderHooker(
+class FolderContextHooker(
     private val docFieldName: String,
     private val useRootWithoutDoc: Boolean,
 ) : XposedInterface.Hooker {

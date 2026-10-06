@@ -4,7 +4,7 @@ import android.database.Cursor
 import android.os.Bundle
 import android.util.Log
 import eu.hxreborn.remembermysort.hook.FolderContextHolder
-import eu.hxreborn.remembermysort.hook.FolderLoaderHooker
+import eu.hxreborn.remembermysort.hook.FolderContextHooker
 import eu.hxreborn.remembermysort.hook.LongPressHook
 import eu.hxreborn.remembermysort.hook.RecentsLoaderHooker
 import eu.hxreborn.remembermysort.hook.SortCursorHooker
@@ -35,7 +35,7 @@ class RememberMySortModule : XposedModule() {
     }
 
     override fun onHotReloading(param: HotReloadingParam): Boolean {
-        LongPressHook.release()
+        LongPressHook.releaseOnMainThread()
         param.setSavedInstanceState(arrayOf(hostClassLoader, FolderContextHolder.saveLast()))
         return true
     }
@@ -89,7 +89,7 @@ class RememberMySortModule : XposedModule() {
                 }
                 log("hooked sort-list class=$className")
             }.onFailure {
-                log("skip class=$className reason=not-found")
+                log("skip class=$className reason=${it.javaClass.simpleName}")
             }
         }
     }
@@ -101,7 +101,7 @@ class RememberMySortModule : XposedModule() {
                 hook(loaderClass.getDeclaredMethod("loadInBackground")).intercept(hooker)
                 log("hooked loader class=$className")
             }.onFailure {
-                log("skip class=$className reason=not-found")
+                log("skip class=$className reason=${it.javaClass.simpleName}")
             }
         }
     }
@@ -118,9 +118,9 @@ class RememberMySortModule : XposedModule() {
         private val LOADERS: List<Pair<String, XposedInterface.Hooker>> =
             listOf(
                 "com.android.documentsui.DirectoryLoader" to
-                    FolderLoaderHooker(docFieldName = "mDoc", useRootWithoutDoc = false),
+                    FolderContextHooker(docFieldName = "mDoc", useRootWithoutDoc = false),
                 "com.android.documentsui.loaders.FolderLoader" to
-                    FolderLoaderHooker(docFieldName = "mListedDir", useRootWithoutDoc = true),
+                    FolderContextHooker(docFieldName = "mListedDir", useRootWithoutDoc = true),
                 "com.android.documentsui.RecentsLoader" to RecentsLoaderHooker,
             )
 

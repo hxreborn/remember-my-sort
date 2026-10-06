@@ -21,11 +21,11 @@ object SortCursorHooker : XposedInterface.Hooker {
     private val lastGlobalSort = Collections.synchronizedMap(WeakHashMap<Any, SortPreference>())
 
     override fun intercept(chain: XposedInterface.Chain): Any? {
-        chain.thisObject?.let(::syncSort)
+        chain.thisObject?.let(::saveOrRestoreSort)
         return chain.proceed()
     }
 
-    private fun syncSort(sortModel: Any) {
+    private fun saveOrRestoreSort(sortModel: Any) {
         val fields =
             runCatching { getSortModelFields(sortModel.javaClass) }
                 .onFailure { e -> log("reflect failed target=sort-model", e) }
