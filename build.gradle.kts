@@ -1,6 +1,3 @@
-import org.gradle.api.plugins.BasePlugin
-import org.gradle.api.tasks.Delete
-
 buildscript {
     dependencies {
         classpath(libs.kotlin.gradle.plugin)
@@ -10,12 +7,6 @@ buildscript {
 plugins {
     base
     alias(libs.plugins.agp.app) apply false
-}
-
-tasks.named<Delete>("clean") {
-    group = BasePlugin.BUILD_GROUP
-    description = "Deletes the build directory."
-    delete(rootProject.layout.buildDirectory)
 }
 
 tasks.register("assembleDebugRelease") {
