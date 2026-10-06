@@ -71,12 +71,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Tag mirror release on a fresh commit
+        env:
+          GH_TOKEN: ${{ secrets.XPOSED_REPO_PAT }}
+          REPO: Xposed-Modules-Repo/eu.hxreborn.remembermysort
+          TAG: ${{ steps.mirror_tag.outputs.mirror_tag }}
+        run: |
+          sha=$(jq -n --arg tag "$TAG" '{message: $tag, tree: "4b825dc642cb6eb9a060e54bf8d69288fbee4904", parents: []}' \
+            | gh api "repos/$REPO/git/commits" --input - --jq .sha)
+          gh api "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$sha"
+
       - name: Mirror to Xposed-Modules-Repo
         uses: softprops/action-gh-release@v3
         with:
           repository: Xposed-Modules-Repo/eu.hxreborn.remembermysort
           token: ${{ secrets.XPOSED_REPO_PAT }}
           tag_name: ${{ steps.mirror_tag.outputs.mirror_tag }}
+          name: ${{ github.ref_name }}
           body: ${{ steps.changelog.outputs.content || format('Release {0}', github.ref_name) }}
           files: app/build/outputs/apk/release/app-release.apk
           fail_on_unmatched_files: true
