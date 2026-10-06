@@ -2,9 +2,11 @@
 agp = "9.4.1"
 kotlin = "2.4.20"
 xposed-api = "102.0.0"
+ktlint = "1.8.0"
 
 [libraries]
 kotlin-gradle-plugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
+ktlint-cli = { group = "com.pinterest.ktlint", name = "ktlint-cli", version.ref = "ktlint" }
 libxposed-api = { group = "io.github.libxposed", name = "api", version.ref = "xposed-api" }
 
 [plugins]

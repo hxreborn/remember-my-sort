@@ -80,13 +80,13 @@ android {
 
 kotlin { jvmToolchain(21) }
 
+val ktlint by configurations.creating
+
 val ktlintSrc by tasks.registering(JavaExec::class) {
     group = "verification"
     description = "Runs ktlint on Kotlin source files"
     mainClass.set("com.pinterest.ktlint.Main")
-    classpath = configurations.detachedConfiguration(
-        dependencies.create("com.pinterest.ktlint:ktlint-cli:1.8.0"),
-    )
+    classpath = ktlint
     args("src/**/*.kt")
 }
 
@@ -98,12 +98,11 @@ tasks.register<JavaExec>("ktlintFormat") {
     group = "formatting"
     description = "Fix Kotlin code style"
     mainClass.set("com.pinterest.ktlint.Main")
-    classpath = configurations.detachedConfiguration(
-        dependencies.create("com.pinterest.ktlint:ktlint-cli:1.8.0"),
-    )
+    classpath = ktlint
     args("-F", "src/**/*.kt")
 }
 
 dependencies {
     compileOnly(libs.libxposed.api)
+    ktlint(libs.ktlint.cli)
 }
