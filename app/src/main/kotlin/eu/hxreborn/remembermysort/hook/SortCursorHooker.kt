@@ -1,6 +1,7 @@
 package eu.hxreborn.remembermysort.hook
 
 import android.util.SparseArray
+import eu.hxreborn.remembermysort.BuildConfig
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import eu.hxreborn.remembermysort.data.FolderSortPreferenceStore
 import eu.hxreborn.remembermysort.data.GlobalSortPreferenceStore
@@ -114,7 +115,7 @@ object SortCursorHooker : XposedInterface.Hooker {
             runCatching { getDimensionFields(targetDim.javaClass) }.getOrNull() ?: return
         dimFields.sortDirection.setInt(targetDim, pref.direction)
         fields.sortedDimension.set(sortModel, targetDim)
-        log("applied sort pos=${pref.position} dir=${pref.direction}")
+        if (BuildConfig.DEBUG) log("applied sort pos=${pref.position} dir=${pref.direction}")
     }
 
     private fun getSortModelFields(clazz: Class<*>): ReflectedSortModel =
