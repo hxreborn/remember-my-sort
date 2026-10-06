@@ -33,7 +33,7 @@ From the file picker's sort menu:
 
 ## Requirements
 
-Requires an Xposed framework with modern API 102 support and Android 11+. Works on Pixel and AOSP-based ROMs. OEM-modified ROMs are untested.
+Requires an Xposed framework with modern API 101 or newer and Android 11+. Works on Pixel and AOSP-based ROMs. OEM-modified ROMs are untested.
 
 ## Installation
 
