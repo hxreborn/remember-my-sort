@@ -20,14 +20,8 @@ jobs:
       - name: Derive mirror tag
         id: mirror_tag
         run: |
-          code=$(grep '^version\.code=' gradle.properties 2>/dev/null | cut -d= -f2)
-          name=$(grep '^version\.name=' gradle.properties 2>/dev/null | cut -d= -f2)
-          if [ -z "$code" ]; then
-            code=$(grep -E '^\s+versionCode\s*=' app/build.gradle.kts | grep -oE '[0-9]+' | head -1)
-          fi
-          if [ -z "$name" ]; then
-            name=$(grep -E '^\s+versionName\s*=' app/build.gradle.kts | grep -oE '"[^"]+"' | tr -d '"' | head -1)
-          fi
+          code=$(grep -E '^\s+versionCode\s*=' app/build.gradle.kts | grep -oE '[0-9]+' | head -1)
+          name=$(grep -E '^\s+versionName\s*=' app/build.gradle.kts | grep -oE '"[^"]+"' | tr -d '"' | head -1)
           echo "mirror_tag=${code}-${name}" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 21
