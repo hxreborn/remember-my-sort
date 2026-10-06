@@ -41,11 +41,8 @@ object SortCursorHooker : XposedInterface.Hooker {
             val pref = getCurrentSortPref(sortModel, fields) ?: return chain.proceed()
             fields.isUserSpecified.setBoolean(sortModel, false)
 
-            val isPerFolderSave = LongPressHook.nextSortIsPerFolder
             val perFolderTargetKey = LongPressHook.perFolderTargetKey
-
-            if (isPerFolderSave && perFolderTargetKey != null) {
-                LongPressHook.nextSortIsPerFolder = false
+            if (perFolderTargetKey != null) {
                 LongPressHook.perFolderTargetKey = null
 
                 FolderSortPreferenceStore.persist(perFolderTargetKey, pref)
@@ -130,8 +127,6 @@ object SortCursorHooker : XposedInterface.Hooker {
 
     private fun getDimensionFields(clazz: Class<*>): ReflectedDimension =
         dimensionFields?.takeIf { it.clazz == clazz }
-            ?: ReflectedDimension(clazz, clazz.accessibleField("mSortDirection")).also {
-                dimensionFields =
-                    it
-            }
+            ?: ReflectedDimension(clazz, clazz.accessibleField("mSortDirection"))
+                .also { dimensionFields = it }
 }

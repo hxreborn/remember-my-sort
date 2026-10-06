@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.Window
+import android.widget.ListView
 import eu.hxreborn.remembermysort.RememberMySortModule.Companion.log
 import java.lang.ref.WeakReference
 import java.lang.reflect.InvocationHandler
@@ -16,14 +17,9 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 object LongPressHook {
-    @Volatile var nextSortIsPerFolder = false
-
     @Volatile var perFolderTargetKey: String? = null
 
-    @Volatile var longPressConsumed = false
-
-    @Volatile var dialogFolderKey: String? = null
-
+    private var dialogFolderKey: String? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var pendingLongPress: Runnable? = null
     private var pressedView: WeakReference<View>? = null
@@ -47,13 +43,7 @@ object LongPressHook {
                     if (method.name == "dispatchTouchEvent" && args?.isNotEmpty() == true) {
                         handleTouchEvent(args[0] as? MotionEvent)
                     }
-                    if (args !=
-                        null
-                    ) {
-                        method.invoke(originalCallback, *args)
-                    } else {
-                        method.invoke(originalCallback)
-                    }
+                    method.invoke(originalCallback, *args.orEmpty())
                 }
 
             val proxy =
@@ -74,7 +64,6 @@ object LongPressHook {
 
     fun onSortListStopped() {
         dialogFolderKey = null
-        longPressConsumed = false
         cancelScheduledLongPress()
         pressedView = null
         currentDecorView = null
@@ -97,7 +86,6 @@ object LongPressHook {
     private fun handleTouchEvent(event: MotionEvent?) {
         when (event?.action) {
             MotionEvent.ACTION_DOWN -> {
-                longPressConsumed = false
                 val x = event.rawX
                 val y = event.rawY
 
@@ -106,11 +94,9 @@ object LongPressHook {
                 }
 
                 cancelScheduledLongPress()
-                pendingLongPress = Runnable { performLongPressClick(x, y) }
-                mainHandler.postDelayed(
-                    pendingLongPress!!,
-                    ViewConfiguration.getLongPressTimeout().toLong(),
-                )
+                val longPress = Runnable { performLongPressClick(x, y) }
+                pendingLongPress = longPress
+                mainHandler.postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
             }
 
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -131,15 +117,11 @@ object LongPressHook {
         x: Float,
         y: Float,
     ) {
-        val listView = pressedView?.get() as? android.widget.ListView ?: return
+        val listView = pressedView?.get() as? ListView ?: return
 
         listView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
 
-        dialogFolderKey?.let { key ->
-            nextSortIsPerFolder = true
-            perFolderTargetKey = key
-        }
-        longPressConsumed = true
+        dialogFolderKey?.let { perFolderTargetKey = it }
 
         val location = IntArray(2)
         listView.getLocationOnScreen(location)
@@ -157,8 +139,8 @@ object LongPressHook {
         pressedView = null
     }
 
-    private fun findListView(parent: View): android.widget.ListView? {
-        if (parent is android.widget.ListView) return parent
+    private fun findListView(parent: View): ListView? {
+        if (parent is ListView) return parent
         if (parent !is ViewGroup) return null
         for (i in 0 until parent.childCount) {
             findListView(parent.getChildAt(i))?.let { return it }
