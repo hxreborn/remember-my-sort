@@ -73,7 +73,8 @@ jobs:
         run: |
           sha=$(jq -n --arg tag "$TAG" '{message: $tag, tree: "4b825dc642cb6eb9a060e54bf8d69288fbee4904", parents: []}' \
             | gh api "repos/$REPO/git/commits" --input - --jq .sha)
-          gh api "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$sha"
+          gh api "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$sha" >/dev/null \
+            || gh api -X PATCH "repos/$REPO/git/refs/tags/$TAG" -f sha="$sha" -F force=true >/dev/null
 
       - name: Mirror to Xposed-Modules-Repo
         uses: softprops/action-gh-release@v3
