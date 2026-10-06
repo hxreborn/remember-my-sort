@@ -73,7 +73,7 @@ commit_parsers = [
   { message = "^doc", skip = true },
   { message = "^style", skip = true },
   { message = '^build(\(\w+\))?:\s*(bump|align|prepare|pin|v?\d+\.\d+)', skip = true },
-  { message = '^build\(cliff\)', skip = true },
+  { message = '^build\((cliff|gradle)\)', skip = true },
   { message = "^build", group = "<!-- 09 -->Build" },
   { message = "^ci", skip = true },
   { message = "^test", group = "<!-- 11 -->Tests" },
