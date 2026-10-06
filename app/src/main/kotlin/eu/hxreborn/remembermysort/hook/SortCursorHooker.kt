@@ -47,9 +47,8 @@ object SortCursorHooker : XposedInterface.Hooker {
         val pref = getCurrentSortPref(sortModel, fields) ?: return
         fields.isUserSpecified.setBoolean(sortModel, false)
 
-        val perFolderTargetKey = LongPressHook.perFolderTargetKey
+        val perFolderTargetKey = LongPressHook.takePerFolderTarget()
         if (perFolderTargetKey != null) {
-            LongPressHook.perFolderTargetKey = null
             FolderSortPreferenceStore.persist(perFolderTargetKey, pref)
             lastGlobalSort.remove(sortModel)
 

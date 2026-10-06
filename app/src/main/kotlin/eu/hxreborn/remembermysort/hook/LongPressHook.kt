@@ -1,5 +1,6 @@
 package eu.hxreborn.remembermysort.hook
 
+import android.app.Dialog
 import android.os.Handler
 import android.os.Looper
 import android.view.HapticFeedbackConstants
@@ -17,7 +18,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 object LongPressHook {
-    @Volatile var perFolderTargetKey: String? = null
+    @Volatile private var perFolderTargetKey: String? = null
 
     private var dialogFolderKey: String? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -28,10 +29,8 @@ object LongPressHook {
 
     fun onSortListStarted(fragment: Any) {
         runCatching {
-            val getDialog = fragment.javaClass.getMethod("getDialog")
-            val dialog = getDialog.invoke(fragment) ?: return
-            val getWindow = dialog.javaClass.getMethod("getWindow")
-            val window = getWindow.invoke(dialog) as? Window ?: return
+            val dialog = fragment.javaClass.getMethod("getDialog").invoke(fragment) as? Dialog
+            val window = dialog?.window ?: return
 
             currentDecorView = WeakReference(window.decorView)
             val originalCallback = window.callback ?: return
@@ -59,6 +58,8 @@ object LongPressHook {
             log("wrap callback failed target=long-press", it)
         }
     }
+
+    fun takePerFolderTarget(): String? = perFolderTargetKey.also { perFolderTargetKey = null }
 
     fun onSortListStopped() {
         dialogFolderKey = null
