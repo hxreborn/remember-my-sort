@@ -13,21 +13,21 @@ internal object GlobalSortPreferenceStore {
     private var cached: SortPreference? = null
 
     @Volatile
-    private var loaded = false
+    private var isLoaded = false
 
     fun persist(pref: SortPreference) {
         if (pref == cached) return
         runCatching {
             file.writeText("${pref.position}:${pref.direction}")
             cached = pref
-            loaded = true
+            isLoaded = true
         }
     }
 
     fun load(): SortPreference? {
-        if (!loaded) {
+        if (!isLoaded) {
             cached = readFromDisk()
-            loaded = true
+            isLoaded = true
         }
         return cached
     }

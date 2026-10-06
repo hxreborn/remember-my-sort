@@ -19,7 +19,7 @@ internal object FolderSortPreferenceStore {
         }
     }
 
-    fun loadIfExists(folderKey: String): SortPreference? = synchronized(lock) { cache[folderKey] }
+    fun load(folderKey: String): SortPreference? = synchronized(lock) { cache[folderKey] }
 
     fun delete(folderKey: String): Boolean {
         val removed =

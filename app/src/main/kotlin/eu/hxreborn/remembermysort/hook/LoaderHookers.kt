@@ -37,8 +37,12 @@ class FolderContextHooker(
                 ?: return root
                     ?.takeIf { useRootWithoutDoc }
                     ?.let { FolderContext.fromRoot(it, getRootFields(it.javaClass)) }
-        val rFields = root?.let { getRootFields(it.javaClass) }
-        return FolderContext.fromDoc(doc, root, getDocFields(doc.javaClass), rFields)
+        return FolderContext.fromDoc(
+            doc,
+            root,
+            getDocFields(doc.javaClass),
+            root?.let { getRootFields(it.javaClass) },
+        )
     }
 
     private fun getLoaderFields(clazz: Class<*>) =

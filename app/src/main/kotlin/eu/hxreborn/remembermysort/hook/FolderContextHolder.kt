@@ -12,9 +12,9 @@ object FolderContextHolder {
     @Volatile
     private var lastLoadedContext: FolderContext? = null
 
-    fun set(ctx: FolderContext?) {
-        threadLocal.set(ctx)
-        if (ctx != null) lastLoadedContext = ctx
+    fun set(context: FolderContext?) {
+        threadLocal.set(context)
+        if (context != null) lastLoadedContext = context
     }
 
     fun get(): FolderContext? = threadLocal.get() ?: lastLoadedContext
@@ -69,8 +69,8 @@ data class FolderContext(
             getIdentifier?.takeIf { it.declaringClass.isInstance(userId) }
                 ?: userId.javaClass.getMethod("getIdentifier").also { getIdentifier = it }
 
-        private fun extractUserId(userIdObj: Any?): Int =
-            userIdObj?.let {
+        private fun extractUserId(userId: Any?): Int =
+            userId?.let {
                 runCatching { identifierMethod(it).invoke(it) as Int }.getOrDefault(0)
             } ?: 0
 

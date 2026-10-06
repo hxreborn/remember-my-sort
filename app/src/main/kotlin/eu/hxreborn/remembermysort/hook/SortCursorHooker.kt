@@ -78,7 +78,7 @@ object SortCursorHooker : XposedInterface.Hooker {
         folderKey: String?,
     ) {
         val pref =
-            folderKey?.let { FolderSortPreferenceStore.loadIfExists(it) }
+            folderKey?.let { FolderSortPreferenceStore.load(it) }
                 ?: GlobalSortPreferenceStore.load()
                 ?: return
         val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return
@@ -96,12 +96,13 @@ object SortCursorHooker : XposedInterface.Hooker {
         fields: ReflectedSortModel,
     ): SortPreference? {
         val dimensions = fields.dimensions.get(sortModel) as? SparseArray<*> ?: return null
-        val currentDim = fields.sortedDimension.get(sortModel) ?: return null
-        val dimFields =
-            runCatching { getDimensionFields(currentDim.javaClass) }.getOrNull() ?: return null
-        val direction = dimFields.sortDirection.getInt(currentDim)
+        val currentDimension = fields.sortedDimension.get(sortModel) ?: return null
+        val dimensionFields =
+            runCatching { getDimensionFields(currentDimension.javaClass) }.getOrNull()
+                ?: return null
+        val direction = dimensionFields.sortDirection.getInt(currentDimension)
         val position =
-            (0 until dimensions.size()).firstOrNull { dimensions.valueAt(it) === currentDim }
+            (0 until dimensions.size()).firstOrNull { dimensions.valueAt(it) === currentDimension }
                 ?: return null
         return SortPreference(position, direction)
     }
@@ -113,11 +114,11 @@ object SortCursorHooker : XposedInterface.Hooker {
         pref: SortPreference,
     ) {
         if (pref.position !in 0 until dimensions.size()) return
-        val targetDim = dimensions.valueAt(pref.position) ?: return
-        val dimFields =
-            runCatching { getDimensionFields(targetDim.javaClass) }.getOrNull() ?: return
-        dimFields.sortDirection.setInt(targetDim, pref.direction)
-        fields.sortedDimension.set(sortModel, targetDim)
+        val targetDimension = dimensions.valueAt(pref.position) ?: return
+        val dimensionFields =
+            runCatching { getDimensionFields(targetDimension.javaClass) }.getOrNull() ?: return
+        dimensionFields.sortDirection.setInt(targetDimension, pref.direction)
+        fields.sortedDimension.set(sortModel, targetDimension)
         if (BuildConfig.DEBUG) log("applied sort pos=${pref.position} dir=${pref.direction}")
     }
 
