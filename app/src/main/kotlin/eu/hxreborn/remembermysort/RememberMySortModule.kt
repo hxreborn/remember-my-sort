@@ -3,7 +3,6 @@ package eu.hxreborn.remembermysort
 import android.database.Cursor
 import android.os.Bundle
 import android.util.Log
-import eu.hxreborn.remembermysort.hook.DirectoryLoaderHooker
 import eu.hxreborn.remembermysort.hook.FolderContextHolder
 import eu.hxreborn.remembermysort.hook.FolderLoaderHooker
 import eu.hxreborn.remembermysort.hook.LongPressHook
@@ -119,8 +118,10 @@ class RememberMySortModule : XposedModule() {
 
         private val LOADERS: List<Pair<String, XposedInterface.Hooker>> =
             listOf(
-                "com.android.documentsui.DirectoryLoader" to DirectoryLoaderHooker,
-                "com.android.documentsui.loaders.FolderLoader" to FolderLoaderHooker,
+                "com.android.documentsui.DirectoryLoader" to
+                    FolderLoaderHooker(docFieldName = "mDoc", useRootWithoutDoc = false),
+                "com.android.documentsui.loaders.FolderLoader" to
+                    FolderLoaderHooker(docFieldName = "mListedDir", useRootWithoutDoc = true),
                 "com.android.documentsui.RecentsLoader" to RecentsLoaderHooker,
             )
 

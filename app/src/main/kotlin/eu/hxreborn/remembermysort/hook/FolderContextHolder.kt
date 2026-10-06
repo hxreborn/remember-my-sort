@@ -2,7 +2,6 @@ package eu.hxreborn.remembermysort.hook
 
 import android.os.Bundle
 import eu.hxreborn.remembermysort.model.DocFields
-import eu.hxreborn.remembermysort.model.ExtendedRootFields
 import eu.hxreborn.remembermysort.model.RootFields
 import eu.hxreborn.remembermysort.util.getStringOrEmpty
 import java.lang.reflect.Method
@@ -89,7 +88,7 @@ data class FolderContext(
 
         fun fromRoot(
             root: Any,
-            fields: ExtendedRootFields,
+            fields: RootFields,
         ): FolderContext? =
             runCatching {
                 FolderContext(
