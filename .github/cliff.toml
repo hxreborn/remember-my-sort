@@ -60,6 +60,7 @@ commit_preprocessors = [
   { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "" },
 ]
 commit_parsers = [
+  { message = '\(polish\)', skip = true },
   { message = "^feat", group = "<!-- 00 -->Features" },
   { message = "^[fF]ix", group = "<!-- 01 -->Bug Fixes" },
   { message = "^perf", group = "<!-- 02 -->Performance Improvements" },
@@ -67,14 +68,16 @@ commit_parsers = [
   { body = ".*[Ss]ecurity", group = "<!-- 03 -->Security" },
   { message = "^refactor", group = "<!-- 04 -->Refactor" },
   { message = "^[Rr]evert", group = "<!-- 05 -->Reverts" },
-  { message = '^(build|chore)\(deps(-dev)?\)', skip = true },
-  { message = "^doc", group = "<!-- 07 -->Documentation" },
-  { message = "^style", group = "<!-- 08 -->Styling" },
+  { message = '^(build|chore)\(deps(-dev)?\)', group = "<!-- 08 -->Dependencies" },
+  { message = "^doc", skip = true },
+  { message = "^style", skip = true },
+  { message = '^build(\(\w+\))?:\s*(bump|align|prepare|pin|v?\d+\.\d+)', skip = true },
   { message = "^build", group = "<!-- 09 -->Build" },
-  { message = "^ci", group = "<!-- 10 -->CI" },
+  { message = "^ci", skip = true },
   { message = "^test", group = "<!-- 11 -->Tests" },
   # Mute release/changelog noise only
-  { message = '^chore(\(release\))?:\s*(prepare|bump|align|v?\d+\.\d+)', skip = true },
+  { message = '^chore\(release\)', skip = true },
+  { message = '^chore:\s*(prepare|bump|align|v?\d+\.\d+)', skip = true },
   { message = '^release:\s*(bump|prepare|v?\d+\.\d+)', skip = true },
   { message = '^chore\(changelog\)', skip = true },
   # Catch-all
