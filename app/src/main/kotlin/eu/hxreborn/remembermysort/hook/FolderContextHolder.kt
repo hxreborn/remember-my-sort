@@ -5,6 +5,7 @@ import eu.hxreborn.remembermysort.model.DocFields
 import eu.hxreborn.remembermysort.model.ExtendedRootFields
 import eu.hxreborn.remembermysort.model.RootFields
 import eu.hxreborn.remembermysort.util.getStringOrEmpty
+import java.lang.reflect.Method
 
 object FolderContextHolder {
     private val threadLocal = ThreadLocal<FolderContext?>()
@@ -62,11 +63,16 @@ data class FolderContext(
             ?: "this folder"
 
     companion object {
-        fun extractUserId(userIdObj: Any?): Int =
+        @Volatile
+        private var getIdentifier: Method? = null
+
+        private fun identifierMethod(userId: Any): Method =
+            getIdentifier?.takeIf { it.declaringClass.isInstance(userId) }
+                ?: userId.javaClass.getMethod("getIdentifier").also { getIdentifier = it }
+
+        private fun extractUserId(userIdObj: Any?): Int =
             userIdObj?.let {
-                runCatching {
-                    it.javaClass.getMethod("getIdentifier").invoke(it) as Int
-                }.getOrDefault(0)
+                runCatching { identifierMethod(it).invoke(it) as Int }.getOrDefault(0)
             } ?: 0
 
         fun fromDoc(
