@@ -74,7 +74,7 @@ class RememberMySortModule : XposedModule() {
 
     private fun hookSortListFragment(classLoader: ClassLoader) {
         for (className in SORT_FRAGMENT_CLASSES) {
-            runCatching {
+            try {
                 val clazz = classLoader.loadClass(className)
                 hook(clazz.getMethod("onStart")).intercept { chain ->
                     chain.proceed().also {
@@ -88,22 +88,33 @@ class RememberMySortModule : XposedModule() {
                     }
                 }
                 log("hooked sort-list class=$className")
-            }.onFailure {
-                log("skip class=$className reason=${it.javaClass.simpleName}")
+            } catch (e: Exception) {
+                logSkip(className, e)
+            } catch (e: LinkageError) {
+                logSkip(className, e)
             }
         }
     }
 
     private fun hookLoaders(classLoader: ClassLoader) {
         for ((className, hooker) in LOADERS) {
-            runCatching {
+            try {
                 val loaderClass = classLoader.loadClass(className)
                 hook(loaderClass.getDeclaredMethod("loadInBackground")).intercept(hooker)
                 log("hooked loader class=$className")
-            }.onFailure {
-                log("skip class=$className reason=${it.javaClass.simpleName}")
+            } catch (e: Exception) {
+                logSkip(className, e)
+            } catch (e: LinkageError) {
+                logSkip(className, e)
             }
         }
+    }
+
+    private fun logSkip(
+        className: String,
+        t: Throwable,
+    ) {
+        log("skip class=$className reason=${t.javaClass.simpleName}")
     }
 
     companion object {
