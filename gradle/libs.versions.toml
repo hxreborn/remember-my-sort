@@ -1,6 +1,6 @@
 [versions]
 agp = "9.4.1"
-kotlin = "2.4.20"
+kotlin = "2.4.21"
 xposed-api = "102.0.0"
 ktlint = "1.8.0"
 
